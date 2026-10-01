@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>benjiprojects1404 · Build &amp; launch on BlockDAG and EVM chains</title>
+<meta name="description" content="Token launches on BlockDAG (chain 1404), Ethereum, Base, BNB Chain, Arbitrum and Polygon, built and checked properly: token, pool, liquidity lock, presale, airdrop, multisig and a plain-spoken site. Fixed prices, your keys throughout.">
+<meta property="og:title" content="Build & launch on BlockDAG and EVM chains — benjiprojects1404">
+<meta property="og:description" content="Token, pool, liquidity lock, presale, airdrop, multisig and site. Fixed prices. You keep your keys.">
+<meta property="og:image" content="/og-image.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F3F5F7; --sheet:#FFFFFF; --ink:#15212C; --muted:#5A6B78; --rule:#D3DBE2;
+    --green:#0E6A4E; --green-tint:#E5F0EA; --green-ink:#0A4F3A;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.6 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+  a{color:var(--green)}
+  a:focus-visible,button:focus-visible{outline:3px solid var(--green);outline-offset:3px;border-radius:4px}
+  .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
+  h1,h2,h3{font-family:"Spectral",Georgia,serif;font-weight:600;line-height:1.15;margin:0;letter-spacing:-.01em}
+
+  /* top bar */
+  .top{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
+  .brand{font-family:"Spectral",Georgia,serif;font-weight:700;font-size:20px;color:var(--ink);text-decoration:none}
+  .brand span{color:var(--green)}
+  .top nav{display:flex;gap:22px;font-size:15px}
+  .top nav a{color:var(--muted);text-decoration:none}
+  .top nav a:hover{color:var(--ink)}
+
+  /* hero */
+  .hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:56px;padding:56px 0 72px;align-items:start}
+  .hero h1{font-size:clamp(34px,4.4vw,52px);max-width:18ch}
+  .hero p.lede{font-size:19px;color:var(--muted);max-width:52ch;margin:22px 0 30px}
+  .actions{display:flex;flex-wrap:wrap;gap:12px}
+  .btn{display:inline-block;padding:13px 22px;border-radius:8px;font-weight:600;font-size:16px;text-decoration:none}
+  .btn.primary{background:var(--green);color:#fff}
+  .btn.primary:hover{background:var(--green-ink)}
+  .btn.quiet{color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--rule)}
+  .btn.quiet:hover{box-shadow:inset 0 0 0 1.5px var(--ink)}
+
+  /* proof ledger */
+  .ledger{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:22px 24px 10px}
+  .ledger h2{font-size:20px;margin-bottom:4px}
+  .ledger .sub{font-size:14px;color:var(--muted);margin:0 0 10px}
+  .ledger ul{list-style:none;margin:0;padding:0}
+  .ledger li{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid var(--rule)}
+  .ledger li b{display:block;font-weight:600}
+  .ledger li small{color:var(--muted);font-size:14px;line-height:1.45;display:block}
+  .ledger li a{white-space:nowrap;font-size:14px;font-weight:600;align-self:center}
+
+  /* sections */
+  section{padding:64px 0;border-top:1px solid var(--rule)}
+  .head{max-width:640px;margin-bottom:30px}
+  .head h2{font-size:clamp(28px,3.4vw,38px)}
+  .head p{color:var(--muted);margin:12px 0 0}
+
+  /* pricing table */
+  .prices{width:100%;border-collapse:collapse;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+  .prices th{text-align:left;font-size:14px;font-weight:600;color:var(--muted);padding:14px 20px;border-bottom:1px solid var(--rule);background:#F8FAFB}
+  .prices td{padding:20px;border-bottom:1px solid var(--rule);vertical-align:top}
+  .prices tr:last-child td{border-bottom:none}
+  .prices td.name{width:22%}
+  .prices td.name b{font-family:"Spectral",Georgia,serif;font-size:21px;font-weight:600;display:block}
+  .prices td.name small{color:var(--muted);font-size:14px}
+  .prices td.inc{color:#33434F;font-size:16px}
+  .prices td.time{white-space:nowrap;color:var(--muted);font-size:15px;width:14%}
+  .prices td.price{white-space:nowrap;text-align:right;width:16%;font-family:"Spectral",Georgia,serif;font-size:26px;font-weight:600}
+  .prices td.price small{display:block;font-family:"Public Sans",sans-serif;font-size:13px;font-weight:400;color:var(--muted)}
+  .prices tr.feature td{background:var(--green-tint)}
+  .note{font-size:15px;color:var(--muted);margin:16px 0 0;max-width:72ch}
+
+  /* steps (a real sequence) */
+  .steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 36px;counter-reset:s}
+  .steps li{counter-increment:s;position:relative;padding-top:46px}
+  .steps li::before{content:counter(s);position:absolute;top:0;left:0;width:32px;height:32px;border-radius:50%;border:1.5px solid var(--green);color:var(--green);font:600 15px/29px "Public Sans",sans-serif;text-align:center}
+  .steps h3{font-size:21px;margin-bottom:6px}
+  .steps p{margin:0;color:var(--muted);font-size:16px}
+
+  /* rules */
+  .rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 48px}
+  .rules div{padding:20px 0;border-top:1px solid var(--rule)}
+  .rules h3{font-size:21px;margin-bottom:6px}
+  .rules p{margin:0;color:var(--muted);font-size:16px}
+
+  /* contact */
+  .contact{background:var(--ink);color:#EAF0F4;border-radius:14px;padding:44px 44px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:40px;align-items:center}
+  .contact h2{font-size:clamp(28px,3.4vw,38px);color:#fff}
+  .contact p{color:#AFC0CC;margin:12px 0 0}
+  .contact dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:10px 18px;font-size:16px}
+  .contact dt{color:#8EA3B2}
+  .contact dd{margin:0;color:#fff;font-weight:600}
+  .contact dd a{color:#fff}
+  .contact .btn.primary{background:#2FB487;color:#0B1A14;margin-top:22px}
+  .contact .btn.primary:hover{background:#3CC897}
+  footer{padding:36px 0 48px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
+
+  @media (max-width:880px){
+    .hero{grid-template-columns:minmax(0,1fr);gap:36px;padding:28px 0 52px}
+    .steps{grid-template-columns:minmax(0,1fr)}
+    .rules{grid-template-columns:minmax(0,1fr)}
+    .contact{grid-template-columns:minmax(0,1fr);padding:32px 24px}
+    .top nav{display:none}
+    /* pricing table becomes stacked rows */
+    .prices thead{display:none}
+    .prices,.prices tbody,.prices tr,.prices td{display:block;width:100%}
+    .prices td{border-bottom:none;padding:6px 20px}
+    .prices tr{border-bottom:1px solid var(--rule);padding:14px 0}
+    .prices td.name,.prices td.time,.prices td.price{width:auto}
+    .prices td.price{text-align:left}
+  }
+  @media (prefers-reduced-motion:no-preference){ html{scroll-behavior:smooth} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="/">benji<span>projects</span>1404</a>
+    <nav aria-label="Sections">
+      <a href="#prices">Prices</a>
+      <a href="#process">How it works</a>
+      <a href="#rules">Ground rules</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <div>
+      <h1>Token launches on BlockDAG and EVM chains, checked the way a banker would check them.</h1>
+      <p class="lede">I build and launch projects on BlockDAG (chain 1404) and on EVM chains such as Ethereum, Base, BNB Chain, Arbitrum and Polygon: token, pool, liquidity lock, presale, airdrop, multisig and the site that explains it all honestly. Fixed prices, written scope, and you keep your own keys from start to finish.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://t.me/benjiprojects1404">Message me on Telegram</a>
+        <a class="btn quiet" href="#prices">See prices</a>
+      </div>
+    </div>
+
+    <aside class="ledger" aria-labelledby="proof">
+      <h2 id="proof">Live on chain 1404 today</h2>
+      <p class="sub">Built solo, open source, and checkable by anyone.</p>
+      <ul>
+        <li><div><b>Reef</b><small>Permissionless DEX: pools, swaps and a 24-hour price oracle</small></div><a href="https://reefdex.fyi">reefdex.fyi</a></li>
+        <li><div><b>Nodal</b><small>Aggregator that routes each trade to the best source; router source verified</small></div><a href="https://nodaldex.fyi">nodaldex.fyi</a></li>
+        <li><div><b>Handshake</b><small>OTC escrow: both sides settle in one transaction, or nothing moves</small></div><a href="https://handshakeotc.fyi">handshakeotc.fyi</a></li>
+        <li><div><b>$REEF</b><small>Fixed-supply token with a presale, refund fallback, airdrop and 12-month liquidity lock</small></div><a href="https://reefdex.fyi/reef/">reefdex.fyi/reef</a></li>
+        <li><div><b>NOCAP</b><small>Community token, ownership renounced, 99.99% of its liquidity time-locked</small></div><a href="https://github.com/benjiprojects1404-maker/nocap">GitHub</a></li>
+      </ul>
+    </aside>
+  </div>
+</div>
+
+<section id="prices">
+  <div class="wrap">
+    <div class="head">
+      <h2>Prices</h2>
+      <p>Every job is a fixed scope and a fixed price, agreed in writing before any work starts.</p>
+    </div>
+    <table class="prices">
+      <thead><tr><th scope="col">Package</th><th scope="col">What you get</th><th scope="col">Typical time</th><th scope="col" style="text-align:right">Price</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="name"><b>Launch Essentials</b><small>For a token going live</small></td>
+          <td class="inc">Fixed-supply token with no owner, a liquidity pool on Reef or your chain's leading DEX, a time-locked liquidity lock, a one-page project site, and source verified on the explorer.</td>
+          <td class="time">1–2 weeks</td>
+          <td class="price">$1,000</td>
+        </tr>
+        <tr class="feature">
+          <td class="name"><b>Full Launch</b><small>For a token with a sale</small></td>
+          <td class="inc">Everything in Essentials, plus a presale with a refund fallback, an airdrop from an on-chain snapshot, a hardware-wallet multisig, a buy-and-claim panel on your site, and a written launch checklist.</td>
+          <td class="time">3–4 weeks</td>
+          <td class="price">$3,500</td>
+        </tr>
+        <tr>
+          <td class="name"><b>Custom build</b><small>DEX, escrow, aggregator, dashboard</small></td>
+          <td class="inc">Scoped to your project, with the same testing, verification and handover as the packages.</td>
+          <td class="time">Quoted per scope</td>
+          <td class="price">$75<small>per hour, quoted up front</small></td>
+        </tr>
+        <tr>
+          <td class="name"><b>Ongoing care</b><small>After launch</small></td>
+          <td class="inc">Site updates, RPC and status monitoring, help with admin actions through your multisig, and a monthly check-in.</td>
+          <td class="time">Monthly</td>
+          <td class="price">$200<small>per month</small></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">Paid in USDT or USDC on a major chain: 50% when the written scope is signed off, 50% at handover. Same packages and prices on BlockDAG, Ethereum, Base, BNB Chain, Arbitrum, Polygon and other EVM chains; network fees are paid from your wallets. Independent audits are not included; for any sizeable raise I recommend one and prepare the audit pack.</p>
+  </div>
+</section>
+
+<section id="process">
+  <div class="wrap">
+    <div class="head">
+      <h2>How it works</h2>
+      <p>Six steps from first message to handover.</p>
+    </div>
+    <ol class="steps">
+      <li><h3>Scoping call</h3><p>We agree what the project needs, which network it lives on, and what it must never do.</p></li>
+      <li><h3>Written scope and quote</h3><p>Deliverables, timeline and price in writing, signed off before work starts.</p></li>
+      <li><h3>Build and test</h3><p>Contracts are tested against the chain's real contracts, including deliberate attempts to break them.</p></li>
+      <li><h3>Deploy together</h3><p>You deploy and fund from your own wallets with a step-by-step checklist. I check every value on-chain before anything is funded.</p></li>
+      <li><h3>Verify and publish</h3><p>Source verified on the explorer and every address published on your site.</p></li>
+      <li><h3>Handover</h3><p>An admin guide, emergency pause steps, and the full source in your own GitHub repository.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section id="rules">
+  <div class="wrap">
+    <div class="head">
+      <h2>Ground rules</h2>
+      <p>What you can count on, and what I won't do.</p>
+    </div>
+    <div class="rules">
+      <div><h3>Your keys, your funds</h3><p>I never hold private keys, seed phrases or project funds. Every deployment and transfer is signed from your wallets.</p></div>
+      <div><h3>No price promises</h3><p>Your pages say what the token is, what it isn't, and the risks. No guaranteed returns and no hype copy.</p></div>
+      <div><h3>The law is yours to check</h3><p>You decide where your sale is allowed and who can take part. I can build in exclusions, but I don't give legal advice.</p></div>
+      <div><h3>Testing isn't an audit</h3><p>My testing is thorough, but it isn't an independent audit. For real money, get one.</p></div>
+      <div><h3>Open source by default</h3><p>Contracts are published and verified so anyone can check them.</p></div>
+      <div><h3>Plain words</h3><p>Before you sign anything, you'll know exactly what each contract does and who controls it.</p></div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap" id="contact" style="padding-top:8px">
+  <div class="contact">
+    <div>
+      <h2>Tell me what you're launching</h2>
+      <p>A short message is enough to start: what the project is, roughly when you want it live, and whether you need a sale.</p>
+      <a class="btn primary" href="https://t.me/benjiprojects1404">Message me on Telegram</a>
+    </div>
+    <dl>
+      <dt>Telegram</dt><dd><a href="https://t.me/benjiprojects1404">@benjiprojects1404</a></dd>
+      <dt>Email</dt><dd><a href="mailto:benjiprojects1404@gmail.com">benjiprojects1404@gmail.com</a></dd>
+      <dt>GitHub</dt><dd><a href="https://github.com/benjiprojects1404-maker">benjiprojects1404-maker</a></dd>
+      <dt>Payment</dt><dd>USDT or USDC</dd>
+    </dl>
+  </div>
+  <footer>
+    <span>benjiprojects1404, based in Thailand</span>
+    <span>Nothing here is financial, investment or legal advice.</span>
+  </footer>
+</div>
+</body>
+</html>
