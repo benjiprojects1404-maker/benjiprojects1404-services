@@ -117,6 +117,7 @@
     .prices td.price{text-align:left}
   }
   @media (prefers-reduced-motion:no-preference){ html{scroll-behavior:smooth} }
+  dd{min-width:0;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -125,6 +126,7 @@
     <a class="brand" href="/">benji<span>projects</span>1404</a>
     <nav aria-label="Sections">
       <a href="#prices">Prices</a>
+      <a href="#review">Code review</a>
       <a href="#process">How it works</a>
       <a href="#rules">Ground rules</a>
       <a href="#contact">Contact</a>
@@ -191,6 +193,39 @@
       </tbody>
     </table>
     <p class="note">Paid in USDT or USDC on a major chain: 50% when the written scope is signed off, 50% at handover. Same packages and prices on BlockDAG, Ethereum, Base, BNB Chain, Arbitrum, Polygon and other EVM chains; network fees are paid from your wallets. Independent audits are not included; for any sizeable raise I recommend one and prepare the audit pack.</p>
+  </div>
+</section>
+
+<section id="review">
+  <div class="wrap">
+    <div class="head">
+      <h2>Pre-audit review</h2>
+      <p>For contracts you've already written or deployed. I read every line, run the standard analysis tools, write tests that try to break it, and check the code on chain matches your published source. You get a plain-English report with every finding ranked and a fix for each. Fixed price, agreed before work starts.</p>
+    </div>
+    <table class="prices">
+      <thead><tr><th scope="col">Review</th><th scope="col">What you get</th><th scope="col">Typical time</th><th scope="col" style="text-align:right">Price</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="name"><b>Token check</b><small>Up to about 200 lines</small></td>
+          <td class="inc">A token, vesting or lock contract: line-by-line review, automated analysis, an on-chain match against your source, and a short report.</td>
+          <td class="time">2–3 days</td>
+          <td class="price">$150</td>
+        </tr>
+        <tr class="feature">
+          <td class="name"><b>Contract review</b><small>Up to about 600 lines</small></td>
+          <td class="inc">Everything in Token check, plus a test suite you keep, attack tests for every finding, and one re-check after you fix.</td>
+          <td class="time">3–5 days</td>
+          <td class="price">$450</td>
+        </tr>
+        <tr>
+          <td class="name"><b>Protocol review</b><small>Up to about 1,500 lines</small></td>
+          <td class="inc">Several contracts working together (a DEX, presale, staking or escrow), including who controls what, plus an audit-ready pack if you go on to a paid audit.</td>
+          <td class="time">1–2 weeks</td>
+          <td class="price">$950</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="note">A pre-audit review is not an independent audit and can't promise there are no bugs. It finds the common mistakes cheaply, so an audit, if you need one, costs less. Larger codebases are quoted per scope. Same payment terms as above. See a real example: the <a href="https://github.com/benjiprojects1404-maker/reef-dex-site/tree/main/contracts">published review of Reef, Nodal and Handshake</a>, with source, tests and findings.</p>
   </div>
 </section>
 
