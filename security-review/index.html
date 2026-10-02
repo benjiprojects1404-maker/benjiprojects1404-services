@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security review · Reef, Nodal, Handshake, $COOKED</title>
+<meta name="description" content="AI-assisted security review of the live Reef, Nodal, Handshake and $COOKED contracts on BlockDAG (chain 1404), 2 October 2026. Not an independent audit.">
+<meta property="og:title" content="Security review: Reef, Nodal, Handshake, $COOKED">
+<meta property="og:description" content="Every live contract read line by line, tested, and matched to its published source on chain. No critical or high findings. Not an independent audit.">
+<meta property="og:image" content="/og-image.png">
+<meta property="og:type" content="article">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="https://benjiprojects1404-services.pages.dev/security-review/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Spectral:wght@500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root{--paper:#F3F5F7;--sheet:#FFFFFF;--ink:#15212C;--muted:#5A6B78;--rule:#D3DBE2;--green:#0E6A4E;--green-tint:#E5F0EA;--amber:#8A5A12;--amber-tint:#FBF1E1;--red:#9B2C2C;--red-tint:#F9E6E6}
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.6 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+  a{color:var(--green)}
+  a:focus-visible{outline:3px solid var(--green);outline-offset:3px;border-radius:4px}
+  .wrap{max-width:960px;margin:0 auto;padding:0 24px}
+  h1,h2,h3{font-family:"Spectral",Georgia,serif;font-weight:600;line-height:1.15;margin:0;letter-spacing:-.01em}
+  code,.mono{font:400 13.5px "JetBrains Mono",ui-monospace,monospace;overflow-wrap:anywhere}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:22px 0;gap:16px}
+  .brand{font-family:"Spectral",Georgia,serif;font-weight:700;font-size:20px;color:var(--ink);text-decoration:none}
+  .brand span{color:var(--green)}
+  .top a.back{font-size:15px;color:var(--muted);text-decoration:none}
+  header.intro{padding:40px 0 36px}
+  .kicker{font-size:14px;font-weight:600;color:var(--green);letter-spacing:.04em;text-transform:uppercase;margin:0 0 10px}
+  h1{font-size:clamp(32px,4.4vw,48px);max-width:20ch}
+  .lede{font-size:19px;color:var(--muted);max-width:60ch;margin:18px 0 0}
+  .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:30px 0 0}
+  .stat{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:16px 18px}
+  .stat b{display:block;font-family:"Spectral",Georgia,serif;font-size:30px;line-height:1.1}
+  .stat span{font-size:14px;color:var(--muted)}
+  .notice{background:var(--amber-tint);border:1px solid #E8CFA3;border-radius:12px;padding:16px 18px;margin:28px 0 0;font-size:16px}
+  .notice b{color:var(--amber)}
+  section{padding:48px 0;border-top:1px solid var(--rule)}
+  section h2{font-size:clamp(26px,3vw,34px);margin-bottom:12px}
+  section > .wrap > p{max-width:68ch}
+  .tbl{width:100%;border-collapse:collapse;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;overflow:hidden;font-size:15px}
+  .tbl th{text-align:left;font-size:13px;font-weight:600;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--rule);background:#F8FAFB}
+  .tbl td{padding:12px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+  .tbl tr:last-child td{border-bottom:none}
+  .ok{color:var(--green);font-weight:600;white-space:nowrap}
+  .part{color:var(--amber);font-weight:600;white-space:nowrap}
+  .sev{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+  .sev.m{background:var(--red-tint);color:var(--red)}
+  .sev.l{background:var(--amber-tint);color:var(--amber)}
+  .sev.n{background:#EEF2F5;color:var(--muted)}
+  .scroll{overflow-x:auto;margin:18px 0 0;border-radius:12px}
+  ol.steps{padding-left:22px;max-width:68ch}
+  ol.steps li{margin:8px 0}
+  .links{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0 0}
+  .btn{display:inline-block;padding:12px 20px;border-radius:8px;font-weight:600;font-size:16px;text-decoration:none}
+  .btn.primary{background:var(--green);color:#fff}
+  .btn.quiet{color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--rule)}
+  footer{padding:36px 0 48px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid var(--rule)}
+  @media (max-width:760px){
+    .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .tbl.stack thead{display:none}
+    .tbl.stack,.tbl.stack tbody,.tbl.stack tr,.tbl.stack td{display:block;width:100%}
+    .tbl.stack tr{border-bottom:1px solid var(--rule);padding:8px 0}
+    .tbl.stack td{border-bottom:none;padding:4px 14px}
+    .tbl.stack td[data-l]::before{content:attr(data-l) ": ";color:var(--muted);font-size:13px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a class="brand" href="/">benji<span>projects</span>1404</a>
+    <a class="back" href="/#review">Get a review like this</a>
+  </div>
+
+  <header class="intro">
+    <p class="kicker">Security review · 2 October 2026</p>
+    <h1>Reef, Nodal, Handshake and $COOKED</h1>
+    <p class="lede">Every live contract behind these four projects was read line by line, run through automated analysis, tested with attacks, and matched against its published source on chain. No critical or high-severity issues were found.</p>
+    <div class="stats">
+      <div class="stat"><b>11</b><span>live contracts reviewed</span></div>
+      <div class="stat"><b>10 of 11</b><span>matched to source on chain</span></div>
+      <div class="stat"><b>64</b><span>tests, all passing</span></div>
+      <div class="stat"><b>0</b><span>critical or high findings</span></div>
+    </div>
+    <div class="notice"><b>This is an AI-assisted review, not an independent audit.</b> It was carried out with AI tools under the developer's direction, by the same developer who built these projects. It can't promise there are no bugs. All four projects stay in beta until an independent audit is done.</div>
+  </header>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>What was checked</h2>
+    <p>"Matched on chain" means the code at the address is exactly what the published source compiles to, ignoring only the compiler's metadata stamp and values fixed at deployment.</p>
+    <div class="scroll">
+      <table class="tbl stack">
+        <thead><tr><th>Project</th><th>Contract</th><th>Address</th><th>On chain</th></tr></thead>
+        <tbody>
+          <tr><td data-l="Project">Reef</td><td data-l="Contract">Factory</td><td data-l="Address"><code>0x9603042044b6B1A1637c508F731ba01219142239</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">Reef</td><td data-l="Contract">Router</td><td data-l="Address"><code>0xbd6fbA41Ab84292163A599510a12d6Bf8B7CCc76</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">Reef</td><td data-l="Contract">WBDAG</td><td data-l="Address"><code>0x62ba5c4F067989a7f6644488C875bEa69Bfa1FBA</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">Reef</td><td data-l="Contract">TWAP price oracle</td><td data-l="Address"><code>0xa461aAe6Ba4bDb68192D2a53e60640053a35FF7b</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">All</td><td data-l="Contract">Admin multisig (2-of-2)</td><td data-l="Address"><code>0x4E2401bFD24c66166fABF9Cc5cD5B6B2c5c860fc</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">Nodal</td><td data-l="Contract">NodalRouter</td><td data-l="Address"><code>0xA06f8a856896aA1836f04F758C1E5Ac5dbe24672</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">Nodal</td><td data-l="Contract">Reef adapter</td><td data-l="Address"><code>0x4b60D344eDA7E3D859739B5AbC1176d756E22d56</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">Handshake</td><td data-l="Contract">OTC escrow</td><td data-l="Address"><code>0xD907701A2D96f7D0E7596b02737C9F36446cf5CA</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">$COOKED</td><td data-l="Contract">Bonding curve</td><td data-l="Address"><code>0xD8a25883dd2576cB7eE7803e23f0309F56bAbA2B</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">$COOKED</td><td data-l="Contract">Token</td><td data-l="Address"><code>0xd95C548B144682f4EF49728944505D8506861B1B</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">NOCAP</td><td data-l="Contract">LP lock</td><td data-l="Address"><code>0x5520cC4E80E86E99c5A6A748C506d80f0d274bB1</code></td><td class="part" data-l="On chain">Settings match</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:16px;font-size:15px;color:var(--muted)">The LP lock's functions and settings match its source, but its bytecode didn't rebuild exactly from the file. On 2 October it held 99.99% of the NOCAP/BDAG pool's LP tokens, locked until 25 March 2027.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Findings</h2>
+    <p>Medium: a real risk under specific conditions. Low: no way to steal funds, but value can be lost or stuck in an edge case. Note: worth knowing.</p>
+    <div class="scroll">
+      <table class="tbl stack">
+        <thead><tr><th>ID</th><th>Contract</th><th>Severity</th><th>Finding</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td data-l="ID" style="white-space:nowrap">M-1</td><td data-l="Contract">Admin multisig</td><td data-l="Severity"><span class="sev m">Medium</span></td><td data-l="Finding">A removed owner's earlier approvals still count, so a pending transaction could pass with fewer current owners than required.</td><td data-l="Status">No exposure today: a 2-of-2 can't remove an owner and nothing is pending. Fixed version ready for the move to 2-of-3.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">L-1</td><td data-l="Contract">Handshake</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">If the fee wallet couldn't receive BDAG, fills would fail. Cancels still work.</td><td data-l="Status">The fee wallet is a plain wallet.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">L-2</td><td data-l="Contract">Handshake</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">Asking for a token with a transfer tax pays the maker less than asked.</td><td data-l="Status">Warning in the Handshake FAQ.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">L-3</td><td data-l="Contract">Handshake</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">A token that blocks or pauses the escrow freezes its offers until it unblocks.</td><td data-l="Status">Warning in the Handshake FAQ.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">L-4</td><td data-l="Contract">Reef router</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">Tokens with a transfer tax can be bought but not sold through Reef.</td><td data-l="Status">Explained in the Reef docs.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">L-5</td><td data-l="Contract">NodalRouter</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">The owner can point a liquidity source at any contract; users are protected by their minimum-output check.</td><td data-l="Status">Accepted. The app always sets a minimum, and the owner is the multisig.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">L-6</td><td data-l="Contract">Admin multisig</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">A transaction whose inner call failed stays executable by anyone until revoked.</td><td data-l="Status">Policy: revoke any failed transaction straight away.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">O-1</td><td data-l="Contract">TWAP oracle</td><td data-l="Severity"><span class="sev n">Note</span></td><td data-l="Finding">Returns 0 before its first update and doesn't report how old its average is.</td><td data-l="Status">Nothing relies on it on chain.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">N-1</td><td data-l="Contract">Handshake</td><td data-l="Severity"><span class="sev n">Note</span></td><td data-l="Finding">Offers never expire, so a forgotten offer can fill at an old price.</td><td data-l="Status">Cancel offers you no longer want.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:16px">Reef's contracts are Uniswap V2 ported to Solidity 0.8 with the names changed; the logic was compared line by line with the original. Nobody, including the developer, can pause Reef, freeze a pool or move funds out of one. On Handshake, the owner has no function that touches a live offer's funds.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>How it was done</h2>
+    <ol class="steps">
+      <li>Every contract read line by line; Reef compared with Uniswap V2's published code.</li>
+      <li>Slither, the standard automated analyser, run on every contract with the deployed compiler settings, and each flag checked by hand.</li>
+      <li>Tests written for anything that looked wrong, so findings are shown to be real, not guessed. 64 tests pass, covering normal use, attacks and random sequences of trades.</li>
+      <li>Each address's code read from chain on 2 October 2026 and compared with what the published source compiles to.</li>
+    </ol>
+    <p>Not covered: the $REEF token and presale contracts, the NOCAP token, the websites (except where they set a swap's minimum output), the BlockDAG chain itself, and anything deployed after 2 October 2026.</p>
+    <div class="links">
+      <a class="btn primary" href="https://github.com/benjiprojects1404-maker/reef-dex-site/tree/main/contracts">Source and tests on GitHub</a>
+      <a class="btn quiet" href="/#review">Get your contracts reviewed</a>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <footer>
+    <span>Found a problem? DM <a href="https://x.com/benji107">@benji107</a> on X, or for Handshake email security@handshakeotc.fyi.</span>
+    <span>Not financial, investment or legal advice.</span>
+  </footer>
+</div>
+</body>
+</html>
