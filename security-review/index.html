@@ -103,7 +103,7 @@
           <tr><td data-l="Project">Reef</td><td data-l="Contract">Router</td><td data-l="Address"><code>0xbd6fbA41Ab84292163A599510a12d6Bf8B7CCc76</code></td><td class="ok" data-l="On chain">Matched</td></tr>
           <tr><td data-l="Project">Reef</td><td data-l="Contract">WBDAG</td><td data-l="Address"><code>0x62ba5c4F067989a7f6644488C875bEa69Bfa1FBA</code></td><td class="ok" data-l="On chain">Matched</td></tr>
           <tr><td data-l="Project">Reef</td><td data-l="Contract">TWAP price oracle</td><td data-l="Address"><code>0xa461aAe6Ba4bDb68192D2a53e60640053a35FF7b</code></td><td class="ok" data-l="On chain">Matched</td></tr>
-          <tr><td data-l="Project">All</td><td data-l="Contract">Admin multisig (2-of-2)</td><td data-l="Address"><code>0x4E2401bFD24c66166fABF9Cc5cD5B6B2c5c860fc</code></td><td class="ok" data-l="On chain">Matched</td></tr>
+          <tr><td data-l="Project">All</td><td data-l="Contract">Admin multisig (2-of-2 at review; 2-of-3 since 9 Oct)</td><td data-l="Address"><code>0x4E2401bFD24c66166fABF9Cc5cD5B6B2c5c860fc</code></td><td class="ok" data-l="On chain">Matched</td></tr>
           <tr><td data-l="Project">Nodal</td><td data-l="Contract">NodalRouter</td><td data-l="Address"><code>0xA06f8a856896aA1836f04F758C1E5Ac5dbe24672</code></td><td class="ok" data-l="On chain">Matched</td></tr>
           <tr><td data-l="Project">Nodal</td><td data-l="Contract">Reef adapter</td><td data-l="Address"><code>0x4b60D344eDA7E3D859739B5AbC1176d756E22d56</code></td><td class="ok" data-l="On chain">Matched</td></tr>
           <tr><td data-l="Project">Handshake</td><td data-l="Contract">OTC escrow</td><td data-l="Address"><code>0xD907701A2D96f7D0E7596b02737C9F36446cf5CA</code></td><td class="ok" data-l="On chain">Matched</td></tr>
@@ -114,6 +114,7 @@
       </table>
     </div>
     <p style="margin-top:16px;font-size:15px;color:var(--muted)">The LP lock's functions and settings match its source, but its bytecode didn't rebuild exactly from the file. On 2 October it held 99.99% of the NOCAP/BDAG pool's LP tokens, locked until 25 March 2027.</p>
+    <div class="notice" style="margin-top:16px"><b>Updates since this review (19 October 2026).</b> The admin multisig is now <b>2-of-3</b>: a third owner was added on 9 October through the multisig itself, with no owner removed. The NOCAP LP lock now rebuilds exactly (it was compiled with OpenZeppelin 5.6.1, not 5.0.2), so all 11 contracts match their source. Their source is also verified on the chain-1404 explorer, apart from Reef's Factory and Router, which are waiting on a verifier setting. The findings below are unchanged.</div>
   </div>
 </section>
 
@@ -125,7 +126,7 @@
       <table class="tbl stack">
         <thead><tr><th>ID</th><th>Contract</th><th>Severity</th><th>Finding</th><th>Status</th></tr></thead>
         <tbody>
-          <tr><td data-l="ID" style="white-space:nowrap">M-1</td><td data-l="Contract">Admin multisig</td><td data-l="Severity"><span class="sev m">Medium</span></td><td data-l="Finding">A removed owner's earlier approvals still count, so a pending transaction could pass with fewer current owners than required.</td><td data-l="Status">No exposure today: a 2-of-2 can't remove an owner and nothing is pending. Fixed version ready for the move to 2-of-3.</td></tr>
+          <tr><td data-l="ID" style="white-space:nowrap">M-1</td><td data-l="Contract">Admin multisig</td><td data-l="Severity"><span class="sev m">Medium</span></td><td data-l="Finding">A removed owner's earlier approvals still count, so a pending transaction could pass with fewer current owners than required.</td><td data-l="Status">No exposure: no owner has ever been removed. On 9 Oct 2026 the multisig moved from 2-of-2 to 2-of-3 by adding a third owner through its own confirmed transaction. A fixed version (V2) is ready if an owner ever needs removing.</td></tr>
           <tr><td data-l="ID" style="white-space:nowrap">L-1</td><td data-l="Contract">Handshake</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">If the fee wallet couldn't receive BDAG, fills would fail. Cancels still work.</td><td data-l="Status">The fee wallet is a plain wallet.</td></tr>
           <tr><td data-l="ID" style="white-space:nowrap">L-2</td><td data-l="Contract">Handshake</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">Asking for a token with a transfer tax pays the maker less than asked.</td><td data-l="Status">Warning in the Handshake FAQ.</td></tr>
           <tr><td data-l="ID" style="white-space:nowrap">L-3</td><td data-l="Contract">Handshake</td><td data-l="Severity"><span class="sev l">Low</span></td><td data-l="Finding">A token that blocks or pauses the escrow freezes its offers until it unblocks.</td><td data-l="Status">Warning in the Handshake FAQ.</td></tr>
