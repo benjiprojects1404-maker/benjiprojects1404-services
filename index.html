@@ -127,7 +127,6 @@
     <nav aria-label="Sections">
       <a href="#prices">Prices</a>
       <a href="#review">Code review</a>
-      <a href="#otc-desk">OTC desk</a>
       <a href="#process">How it works</a>
       <a href="#rules">Ground rules</a>
       <a href="#contact">Contact</a>
@@ -189,7 +188,13 @@
           <td class="price">$3,500</td>
         </tr>
         <tr>
-          <td class="name"><b>Custom build</b><small>DEX, escrow, aggregator, dashboard</small></td>
+          <td class="name"><b>Dashboard</b><small>Read-only view of a token, pool or wallet set</small></td>
+          <td class="inc">Stats, activity and a portfolio view, read straight from the chain, with a CSV export. No contracts and no custody of funds.</td>
+          <td class="time">About 1 week</td>
+          <td class="price">$500</td>
+        </tr>
+        <tr>
+          <td class="name"><b>Custom build</b><small>DEX, escrow, aggregator, bot</small></td>
           <td class="inc">Scoped to your project, with the same testing, verification and handover as the packages.</td>
           <td class="time">Quoted per scope</td>
           <td class="price">$75<small>per hour, quoted up front</small></td>
@@ -202,7 +207,7 @@
         </tr>
       </tbody>
     </table>
-    <p class="note">Paid in USDT or USDC on a major chain: 50% when the written scope is signed off, 50% at handover. Same packages and prices on Ethereum, Base, BNB Chain, Arbitrum, Polygon, Arc, BlockDAG and other EVM chains; network fees are paid from your wallets. Direct clients can instead ask for a Payoneer payment request (an invoice, in USD) on the same 50/50 terms. Card and PayPal payments through Payoneer carry a processing fee, added to the invoice; USDT or USDC has none beyond network fees. Independent audits are not included; for any sizeable raise I recommend one and prepare the audit pack.</p>
+    <p class="note">Paid in USDT or USDC on a major chain: 50% when the written scope is signed off, 50% at handover. Same packages and prices on Ethereum, Base, BNB Chain, Arbitrum, Polygon, Arc and other EVM chains, and BlockDAG (chain 1404); network fees are paid from your wallets. Direct clients can instead ask for a Payoneer payment request (an invoice, in USD) on the same 50/50 terms. Card and PayPal payments through Payoneer carry a processing fee, added to the invoice; USDT or USDC has none beyond network fees. Independent audits are not included; for any sizeable raise I recommend one and prepare the audit pack.</p>
     <p class="note"><b>Sizing a raise or a fair-launch target:</b> the target decides the final price of the sale and how deep the pool starts. Too low and the pool is thin and trades move the price a lot; too high and the sale may never fill. We agree the target in the written scope and I show you what each choice means before you commit. I learned this on $COOKED, where the target I set was lower than I would pick now.</p>
   </div>
 </section>
@@ -240,32 +245,6 @@
   </div>
 </section>
 
-<section id="otc-desk">
-  <div class="wrap">
-    <div class="head">
-      <h2>Private OTC desk</h2>
-      <p>Your own copy of the escrow behind <a href="https://chordotc.com">Chord OTC</a> and <a href="https://handshakeotc.fyi">Handshake</a>, for a fund, trading group or marketplace that settles large trades between its own members. Each side locks their leg in the contract and both legs settle in one transaction, or nothing moves. No middleman holding funds, no trust in the other side needed.</p>
-    </div>
-    <table class="prices">
-      <thead><tr><th scope="col">Package</th><th scope="col">What you get</th><th scope="col">Typical time</th><th scope="col" style="text-align:right">Price</th></tr></thead>
-      <tbody>
-        <tr class="feature">
-          <td class="name"><b>Private desk</b><small>For your own members</small></td>
-          <td class="inc">The escrow contract deployed on your EVM chain and owned by your multisig, your token list and per-offer limits, your fee setting, a branded desk site with shareable offer links, the test suite, explorer verification and a written handover.</td>
-          <td class="time">2–3 weeks</td>
-          <td class="price">$2,500</td>
-        </tr>
-        <tr>
-          <td class="name"><b>Shared-fee desk</b><small>Lower cost up front</small></td>
-          <td class="inc">The same desk, with a small share of the desk's trading fee paid to me on-chain for as long as it runs.</td>
-          <td class="time">2–3 weeks</td>
-          <td class="price">$1,500 + fee share</td>
-        </tr>
-      </tbody>
-    </table>
-    <p class="note">For your own members' use: not for resale or for running as a public trading venue. Not offered on BlockDAG (chain 1404) or Arc, where I run Handshake and Chord. Members-only access (approved wallets) and extra chains are quoted per scope. Same payment terms as above; the code is unaudited unless you commission an audit.</p>
-  </div>
-</section>
 
 <section id="process">
   <div class="wrap">
@@ -297,7 +276,7 @@
       <div><h3>Testing isn't an audit</h3><p>My testing is thorough, but it isn't an independent audit. For real money, get one.</p></div>
       <div><h3>Open source by default</h3><p>Contracts are published so anyone can check them against the chain.</p></div>
       <div><h3>Plain words</h3><p>Before you sign anything, you'll know exactly what each contract does and who controls it.</p></div>
-      <div><h3>One brief, one job</h3><p>I take fixed-scope work: a written brief, a price and a delivery date. I don't take employment, long-term contracts or open-ended retainers. If you need more later, it's a new brief.</p></div>
+      <div><h3>One brief, one job</h3><p>I take fixed-scope work: a written brief, a price and a delivery date. Longer-term ongoing work (about 20 hours a week) is available, quoted in writing.</p></div>
       <div><h3>Same rules on Fiverr and Upwork</h3><p>If a job starts on Fiverr or Upwork, it stays there, with that platform's scope, messages and payment protection. The ground rules above apply either way.</p></div>
     </div>
   </div>
