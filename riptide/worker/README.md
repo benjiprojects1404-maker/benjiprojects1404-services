@@ -27,6 +27,18 @@ Open `<that address>/api/latest` after a minute or two: it should show six rows.
 
 Then set `DEFAULT_API` near the top of the script in `riptide/index.html` to that address (or send it to Claude to do).
 
+## If Arc quotes keep failing (optional)
+
+Cloudflare's servers are shared, so Arc's public RPC sometimes rate-limits them (the dashboard shows "arc: -32005 rate limit…").
+The Worker retries, but if it still misses a lot, give it a private Arc endpoint: create a free Arc mainnet app at a
+provider such as Alchemy, copy its HTTPS URL, then run:
+
+```bash
+npx wrangler secret put ARC_RPC_URL     # paste the URL when asked; it is stored encrypted in Cloudflare
+```
+
+No redeploy needed. The public RPC stays as the fallback. Never commit that URL: it contains your key.
+
 ## Endpoints
 
 - `/api/latest` latest check for every pair and size

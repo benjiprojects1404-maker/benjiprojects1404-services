@@ -30,19 +30,41 @@ function quoteCall(tokenIn, tokenOut, amountIn, fee) {
   return QUOTE_SELECTOR + addrWord(tokenIn) + addrWord(tokenOut) + word(amountIn) + word(fee) + word(0);
 }
 
-async function rpcBatch(calls) {
-  const body = calls.map((c, i) => ({ jsonrpc: "2.0", id: i, method: c.method, params: c.params }));
-  const r = await fetch(ARC_RPC, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error("arc rpc " + r.status);
-  const res = await r.json();
-  const out = [];
-  for (const x of Array.isArray(res) ? res : [res]) out[x.id] = x.error ? null : x.result;
-  return out;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// Sends the calls as one JSON-RPC batch. Calls that fail (often "rate limit" on shared Cloudflare IPs) are
+// retried a few times, then on the next endpoint. Returns results by index plus the last error seen.
+async function rpcBatch(calls, endpoints) {
+  const out = new Array(calls.length).fill(null);
+  let todo = calls.map((_, i) => i), lastErr = null;
+  for (const url of endpoints) {
+    for (let attempt = 0; attempt < 3 && todo.length; attempt++) {
+      if (attempt) await sleep(1500 * attempt);
+      try {
+        const body = todo.map(i => ({ jsonrpc: "2.0", id: i, method: calls[i].method, params: calls[i].params }));
+        const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        if (!r.ok) { lastErr = "http " + r.status; continue; }
+        const res = await r.json();
+        for (const x of Array.isArray(res) ? res : [res]) {
+          if (x.error) lastErr = (x.error.code ? x.error.code + " " : "") + (x.error.message || "error");
+          else if (x.id != null) out[x.id] = x.result;
+        }
+      } catch (e) { lastErr = String(e.message || e); }
+      todo = todo.filter(i => out[i] == null);
+    }
+    if (!todo.length) break;
+  }
+  return { out, lastErr: todo.length ? lastErr : null };
 }
 
 async function refPrice(p) {
   const coinbase = async sym => {
-    const r = await fetch(`https://api.exchange.coinbase.com/products/${sym}/ticker`, { headers: { "user-agent": "riptide-monitor" } });
+    let r;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) await sleep(1000 * attempt);
+      r = await fetch(`https://api.exchange.coinbase.com/products/${sym}/ticker`, { headers: { "user-agent": "riptide-monitor" } });
+      if (r.status !== 429) break;   // shared Cloudflare IPs sometimes get "too many requests"
+    }
     if (!r.ok) throw new Error("coinbase " + r.status);
     const j = await r.json();
     return { bid: Number(j.bid), ask: Number(j.ask), src: "coinbase", fee: COINBASE_FEE };
@@ -64,9 +86,10 @@ async function refPrice(p) {
 const units = (n, dec) => BigInt(Math.round(n * 10 ** Math.min(dec, 12))) * 10n ** BigInt(Math.max(0, dec - 12));
 const fromUnits = (v, dec) => Number(v) / 10 ** dec;
 
-export async function sample() {
+export async function sample(env = {}) {
   const ts = Math.floor(Date.now() / 1000);
-  const refs = await Promise.all(PAIRS.map(p => refPrice(p).catch(e => ({ error: String(e.message || e) }))));
+  const refs = [];
+  for (const p of PAIRS) { refs.push(await refPrice(p).catch(e => ({ error: String(e.message || e) }))); await sleep(250); }
 
   // One JSON-RPC batch for every quote plus the gas price.
   const calls = [{ method: "eth_gasPrice", params: [] }];
@@ -82,8 +105,10 @@ export async function sample() {
     }
   });
   // If Arc can't be reached, still log the minute with the reason instead of saving nothing.
-  let res = [], arcError = null;
-  try { res = await rpcBatch(calls); } catch (e) { arcError = "arc: " + String(e.message || e).slice(0, 120); }
+  // ARC_RPC_URL (optional secret, e.g. a free Alchemy / dRPC Arc endpoint) is tried before the public RPC.
+  const endpoints = [env.ARC_RPC_URL, ARC_RPC].filter(Boolean);
+  const { out: res, lastErr } = await rpcBatch(calls, endpoints);
+  const arcError = lastErr ? "arc: " + lastErr.slice(0, 120) : null;
   const gasPrice = res[0] ? BigInt(res[0]) : 20000000000n;
   const gasUsd = Number(GAS_UNITS * gasPrice) / 1e18; // native USDC has 18 decimals
 
@@ -93,7 +118,7 @@ export async function sample() {
     for (const usd of SIZES) {
       const row = { ts, pair: p.id, size: usd, ref_src: ref.src || null, cex_bid: ref.bid ?? null, cex_ask: ref.ask ?? null,
         arc_buy: null, arc_sell: null, gross_a: null, gross_b: null, net_a: null, net_b: null, net_best: null, would_trade: 0,
-        cex_fee: ref.fee ?? p.cexFee, gas_usd: gasUsd, error: ref.error || arcError || null };
+        cex_fee: ref.fee ?? p.cexFee, gas_usd: gasUsd, error: ref.error || null };
       if (!row.error) {
         const b = plan.find(x => x.i === i && x.usd === usd && x.dir === "buy");
         const s = plan.find(x => x.i === i && x.usd === usd && x.dir === "sell");
@@ -106,7 +131,7 @@ export async function sample() {
         if (row.arc_sell) { row.gross_b = row.arc_sell / ref.ask - 1; row.net_b = row.gross_b - costs; } // buy exchange, sell Arc
         const nets = [row.net_a, row.net_b].filter(v => v !== null);
         if (nets.length) { row.net_best = Math.max(...nets); row.would_trade = row.net_best > 0 ? 1 : 0; }
-        if (!row.arc_buy && !row.arc_sell) row.error = "no arc quote";
+        if (!row.arc_buy && !row.arc_sell) row.error = arcError || "no arc quote";
       }
       rows.push(row);
     }
@@ -163,7 +188,7 @@ async function api(url, env) {
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil((async () => {
-      const rows = await sample();
+      const rows = await sample(env);
       await store(env, rows);
       const errs = [...new Set(rows.map(r => r.error).filter(Boolean))];
       console.log(`riptide: saved ${rows.length} rows` + (errs.length ? `; issues: ${errs.join(" | ")}` : "; all sources ok"));
