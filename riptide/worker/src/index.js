@@ -38,6 +38,12 @@ async function rpcBatch(calls, endpoints) {
   const out = new Array(calls.length).fill(null);
   let todo = calls.map((_, i) => i), lastErr = null;
   for (const url of endpoints) {
+    // Make sure the endpoint really is Arc mainnet before trusting its answers.
+    try {
+      const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 0, method: "eth_chainId", params: [] }) });
+      const j = await r.json();
+      if (j.result && parseInt(j.result, 16) !== 5042) { lastErr = `endpoint is chain ${parseInt(j.result, 16)}, not Arc mainnet (5042)`; continue; }
+    } catch (_) { /* let the main call report the problem */ }
     for (let attempt = 0; attempt < 3 && todo.length; attempt++) {
       if (attempt) await sleep(1500 * attempt);
       try {
@@ -47,7 +53,8 @@ async function rpcBatch(calls, endpoints) {
         const res = await r.json();
         for (const x of Array.isArray(res) ? res : [res]) {
           if (x.error) lastErr = (x.error.code ? x.error.code + " " : "") + (x.error.message || "error");
-          else if (x.id != null) out[x.id] = x.result;
+          else if (x.id != null && x.result && x.result !== "0x") out[x.id] = x.result;
+          else if (x.id != null) lastErr = "empty result (no contract at that address on this network?)";
         }
       } catch (e) { lastErr = String(e.message || e); }
       todo = todo.filter(i => out[i] == null);
