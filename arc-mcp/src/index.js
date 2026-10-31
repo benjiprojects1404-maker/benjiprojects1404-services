@@ -41,21 +41,34 @@ const toUnits = (s, dec) => {
 const fromUnits = (v, dec) => { const s = BigInt(v).toString().padStart(dec + 1, "0"); const i = s.slice(0, -dec) || "0", f = s.slice(-dec).replace(/0+$/, ""); return dec ? (f ? `${i}.${f}` : i) : s; };
 
 async function rpc(env, method, params) {
-  let last;
-  for (const url of [env.ARC_RPC_URL, ARC_RPC].filter(Boolean)) {
+  // Labels only — never include the URL itself, since ARC_RPC_URL may embed an API key.
+  const endpoints = [["custom ARC_RPC_URL", env.ARC_RPC_URL], ["public ARC_RPC", ARC_RPC]].filter(([, url]) => url);
+  const failures = [];
+  for (const [label, url] of endpoints) {
+    let last;
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt) await new Promise(r => setTimeout(r, 800 * attempt));
       try {
         const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+        if (!r.ok) { last = `HTTP ${r.status} ${r.statusText}`.trim(); continue; }
         const j = await r.json();
         if (j.error) { last = j.error.message; continue; }
         return j.result;
       } catch (e) { last = e.message; }
     }
+    failures.push(`${label}: ${last}`);
   }
-  throw new Error("Arc RPC unavailable: " + last);
+  throw new Error("Arc RPC unavailable: " + failures.join("; "));
 }
 const call = (env, to, data) => rpc(env, "eth_call", [{ to, data }, "latest"]);
+
+// Reach Riptide through the service binding when present (required on Cloudflare: error 1042 otherwise).
+async function riptide(env, path) {
+  const r = await (env.RIPTIDE ? env.RIPTIDE.fetch(RIPTIDE + path) : fetch(RIPTIDE + path));
+  const text = await r.text();
+  if (!r.ok) throw new Error(`Riptide ${path} failed: HTTP ${r.status} ${text.slice(0, 120)}`);
+  try { return JSON.parse(text); } catch { throw new Error(`Riptide ${path} returned non-JSON: ${text.slice(0, 120)}`); }
+}
 
 // ---------- tools ----------
 const TOOLS = [
@@ -102,8 +115,8 @@ const TOOLS = [
     description: "Latest Riptide check: the gap between Arc's Uniswap pools and Coinbase (or, for ARGUS, between Arc's v3 and v4 pools) at $10 and $1,000, after fees, and whether any pair is paused by the rug alarm. Riptide is a paper-trading monitor; it never trades.",
     inputSchema: { type: "object", properties: {} },
     annotations: { readOnlyHint: true, openWorldHint: true },
-    async run() {
-      const j = await (await fetch(RIPTIDE + "/api/latest")).json();
+    async run(_, env) {
+      const j = await riptide(env, "/api/latest");
       return { checked_at: j.rows?.[0] ? new Date(j.rows[0].ts * 1000).toISOString() : null,
         rows: (j.rows || []).map(r => ({ pair: r.pair, size_usd: r.size, against: r.ref_src, best_gap_after_costs_pct: r.net_best == null ? null : +(r.net_best * 100).toFixed(3),
           would_trade: !!r.would_trade, paused: r.alert || null, error: r.error || null })),
@@ -115,8 +128,8 @@ const TOOLS = [
     description: "Rug-alarm events from Riptide: sudden price drops (20%+) or liquidity pulled (50%+) between two one-minute checks, on the Arc pools it watches.",
     inputSchema: { type: "object", properties: { days: { type: "integer", minimum: 1, maximum: 30, description: "Look-back in days (default 7)" } } },
     annotations: { readOnlyHint: true, openWorldHint: true },
-    async run({ days = 7 }) {
-      const j = await (await fetch(`${RIPTIDE}/api/events?days=${Math.min(30, Math.max(1, days | 0))}`)).json();
+    async run({ days = 7 }, env) {
+      const j = await riptide(env, `/api/events?days=${Math.min(30, Math.max(1, days | 0))}`);
       return { days, thresholds: j.rugAlarm, events: (j.rows || []).map(e => ({ at: new Date(e.ts * 1000).toISOString(), pair: e.pair, pool: e.pool, kind: e.kind, change_pct: +(e.change * 100).toFixed(1) })) };
     },
   },

@@ -1,3 +1,9 @@
 name = "arc-mcp"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
+
+# Worker-to-Worker calls on the same account must use a service binding;
+# fetching riptide's *.workers.dev URL directly fails with Cloudflare error 1042.
+[[services]]
+binding = "RIPTIDE"
+service = "riptide"
