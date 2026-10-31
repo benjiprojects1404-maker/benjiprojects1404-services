@@ -5,31 +5,42 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Riptide · Arc price-gap monitor</title>
 <meta name="description" content="Riptide watches Arc's Uniswap pools against Binance and Coinbase every minute and logs every price gap after real costs. Paper trading only: it never trades.">
-<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="mark.svg" type="image/svg+xml">
+<meta name="theme-color" content="#090a0a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Spectral:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* Same black-and-gold palette as Chord OTC and Crescent. */
 :root{
-  --paper:#F3F5F7; --sheet:#FFFFFF; --ink:#15212C; --muted:#5A6B78; --rule:#D3DBE2;
-  --green:#0E6A4E; --green-tint:#E5F0EA; --red:#A33A2B; --red-tint:#F7E6E2;
-  --l1:#0E6A4E; --l2:#1F5FA8; --l3:#B5651D; --l4:#8A3FA0;
+  color-scheme:dark;
+  --paper:#090a0a; --sheet:#111312; --sheet-2:#171a19; --ink:#ece8de; --muted:#a29d90; --rule:#232624; --rule-2:#2f3331;
+  --gold:#d9b45a; --gold-2:#ecd08a; --gold-ink:#1b1406; --gold-soft:rgba(217,180,90,.11);
+  --metal:linear-gradient(135deg,#f3dc9a 0%,#d9b45a 38%,#b48a35 62%,#e6c97d 100%);
+  --green:#57c094; --green-tint:rgba(87,192,148,.13); --red:#e07a6a; --red-tint:rgba(224,122,106,.12);
+  --l1:#e3c06a; --l2:#6aa8e0; --l3:#ee8a5c; --l4:#c48ae6;
+  --grid:#232624; --serif:"Cormorant Garamond",Georgia,serif;
   --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 "Public Sans",system-ui,sans-serif}
-h1,h2,h3{font-family:"Spectral",Georgia,serif;font-weight:600;line-height:1.15;margin:0;letter-spacing:-.01em}
-a{color:var(--green)}
-header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--sheet)}
-.brand{font-family:"Spectral",Georgia,serif;font-weight:700;font-size:20px;color:var(--ink);text-decoration:none}
+html{background:var(--paper)}
+body{margin:0;min-height:100vh;color:var(--ink);font:14.5px/1.6 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(ellipse at 15% -10%,rgba(217,180,90,.10) 0%,rgba(9,10,10,0) 55%),var(--paper)}
+h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.1;margin:0}
+a{color:var(--gold)}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--rule);background:rgba(9,10,10,.6)}
+.brand{display:flex;align-items:center;gap:10px;font:700 24px/1 var(--serif);color:var(--ink);text-decoration:none;letter-spacing:.3px}
+.brand img{width:30px;height:30px}
+.back{font-size:13px;color:var(--muted);text-decoration:none;white-space:nowrap} .back:hover{color:var(--gold-2)}
 .spacer{flex:1}
-.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--rule);color:var(--muted);white-space:nowrap}
-.pill.live{border-color:#9cc9b4;background:var(--green-tint);color:var(--green)}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--rule-2);color:var(--muted);white-space:nowrap}
+.pill.live{border-color:rgba(87,192,148,.4);background:var(--green-tint);color:var(--green)}
 main{max-width:980px;margin:0 auto;padding:28px 16px 40px}
-h1{font-size:44px} .lede{color:var(--muted);max-width:680px;margin:10px 0 22px}
+h1{font-size:52px;background:var(--metal);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block}
+.lede{color:var(--muted);max-width:680px;margin:10px 0 22px}
 .card{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:20px;margin-bottom:18px}
-.card h2{font-size:26px;margin-bottom:4px} .sub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
-.notice{border-left:3px solid var(--green);background:var(--green-tint);padding:10px 14px;border-radius:6px;font-size:14px;margin-bottom:18px}
+.card h2{font-size:30px;margin-bottom:4px;color:var(--gold-2)} .sub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.notice{border-left:3px solid var(--gold);background:var(--gold-soft);padding:10px 14px;border-radius:6px;font-size:14px;margin-bottom:18px}
 .tablewrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th,td{padding:8px 8px;border-bottom:1px solid var(--rule);text-align:left;white-space:nowrap}
@@ -42,27 +53,29 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .seg button{border:1px solid var(--rule);background:var(--sheet);padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
 .seg button:first-child{border-radius:8px 0 0 8px} .seg button:last-child{border-radius:0 8px 8px 0} .seg button+button{border-left:none}
-.seg button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--metal);color:var(--gold-ink);border-color:var(--gold);font-weight:600}
+.seg button:hover{border-color:var(--gold)}
 .seg{display:inline-flex}
 #chart{width:100%;height:300px;display:block}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-top:8px;color:var(--muted)}
 .legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
 .stat{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
-.stat b{display:block;font-family:"Spectral",Georgia,serif;font-size:28px;font-weight:600;line-height:1.1}
+.stat b{display:block;font-family:var(--serif);font-size:32px;color:var(--gold-2);font-weight:600;line-height:1.1}
 .stat span{color:var(--muted);font-size:12.5px}
 ul.plain{margin:0;padding-left:18px} ul.plain li{margin:4px 0}
 .mono{font-family:var(--mono);font-size:12.5px}
 .btn{display:inline-block;border:1px solid var(--rule);background:var(--sheet);border-radius:8px;padding:7px 12px;font-size:13px;text-decoration:none;color:var(--ink)}
 .empty{color:var(--muted);font-size:14px;padding:6px 0}
 footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font-size:12.5px}
-@media (max-width:700px){ h1{font-size:34px} .stats{grid-template-columns:repeat(2,1fr)} }
+@media (max-width:700px){ h1{font-size:40px} .back{display:none} header{padding:12px 16px} .stats{grid-template-columns:repeat(2,1fr)} }
 </style>
 </head>
 <body>
 <header>
-  <a class="brand" href="../">benjiprojects1404</a>
+  <a class="brand" href="./"><img src="mark.svg" alt="">Riptide</a>
   <span class="spacer"></span>
+  <a class="back" href="../">benjiprojects1404 ↗</a>
   <span class="pill" id="statusPill">Connecting…</span>
 </header>
 
@@ -144,7 +157,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 </main>
 
 <footer>
-  Riptide by benjiprojects1404 · Data: Arc mainnet (Uniswap v3), Binance and Coinbase public APIs · <a href="https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/riptide">Source</a> · Sister tool: <a href="https://chordotc.com/crescent/">Crescent</a>
+  Riptide by <a href="../">benjiprojects1404</a> · Data: Arc mainnet (Uniswap v3), Binance and Coinbase public APIs · <a href="https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/riptide">Source</a> · Sister tool: <a href="https://chordotc.com/crescent/">Crescent</a>
 </footer>
 
 <script>
@@ -235,7 +248,7 @@ async function loadChart() {
   const byPair = {};
   for (const r of j.rows || []) if (r.nb != null) (byPair[r.pair] ||= []).push([r.t, r.nb]);
   const pts = Object.values(byPair).flat();
-  if (!pts.length) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="#5A6B78" font-size="14">No data for this period yet</text>`; $("legend").innerHTML = ""; return; }
+  if (!pts.length) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="#a29d90" font-size="14">No data for this period yet</text>`; $("legend").innerHTML = ""; return; }
   const t0 = Math.min(...pts.map(p => p[0])), t1 = Math.max(...pts.map(p => p[0])) || t0 + 1;
   const clipped = new Set();
   for (const [pair, ps] of Object.entries(byPair)) for (const p of ps) if (p[1] < FLOOR) { p[1] = FLOOR; clipped.add(pair); }
@@ -247,18 +260,18 @@ async function loadChart() {
   let g = "";
   for (let i = 0; i <= 4; i++) {
     const v = y0 + (y1 - y0) * i / 4;
-    g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#E4E9EE"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="#5A6B78">${(v * 100).toFixed(2)}%</text>`;
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#232624"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="#a29d90">${(v * 100).toFixed(2)}%</text>`;
   }
-  g += `<line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="#15212C" stroke-width="1.2"/><text x="${W - R + 6}" y="${Y(0) + 4}" font-size="11" fill="#15212C">break-even</text>`;
-  for (const t of [t0, (t0 + t1) / 2, t1]) g += `<text x="${X(t)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#5A6B78">${new Date(t * 1000).toLocaleString("en-GB", days === 1 ? { timeStyle: "short" } : { day: "numeric", month: "short" })}</text>`;
+  g += `<line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="#d9b45a" stroke-width="1.2" stroke-dasharray="4 3"/><text x="${W - R + 6}" y="${Y(0) + 4}" font-size="11" fill="#d9b45a">break-even</text>`;
+  for (const t of [t0, (t0 + t1) / 2, t1]) g += `<text x="${X(t)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#a29d90">${new Date(t * 1000).toLocaleString("en-GB", days === 1 ? { timeStyle: "short" } : { day: "numeric", month: "short" })}</text>`;
   for (const [pair, ps] of Object.entries(byPair)) {
     const d = ps.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" ");
     const last = ps[ps.length - 1];
-    g += `<path d="${d}" fill="none" stroke="${COLORS[pair] || "#333"}" stroke-width="2"/>`;
-    if (!clipped.has(pair)) g += `<text x="${X(last[0]) + 6}" y="${Y(last[1]) - 6}" font-size="11" font-weight="600" fill="${COLORS[pair] || "#333"}">${esc(pair)}</text>`;
+    g += `<path d="${d}" fill="none" stroke="${COLORS[pair] || "#888"}" stroke-width="2"/>`;
+    if (!clipped.has(pair)) g += `<text x="${X(last[0]) + 6}" y="${Y(last[1]) - 6}" font-size="11" font-weight="600" fill="${COLORS[pair] || "#888"}">${esc(pair)}</text>`;
   }
   svg.innerHTML = g;
-  $("legend").innerHTML = Object.keys(byPair).map(p => `<span><i style="background:${COLORS[p] || "#333"}"></i>${esc(p)}${clipped.has(p) ? " (often below −3%, drawn at the bottom edge)" : ""}</span>`).join("");
+  $("legend").innerHTML = Object.keys(byPair).map(p => `<span><i style="background:${COLORS[p] || "#888"}"></i>${esc(p)}${clipped.has(p) ? " (often below −3%, drawn at the bottom edge)" : ""}</span>`).join("");
 }
 
 function seg(id, cb) {
