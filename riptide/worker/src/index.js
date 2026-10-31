@@ -5,6 +5,8 @@
 //   1. asks Arc's Uniswap v3 QuoterV2 what a $10 and a $1,000 trade would return, both directions;
 //   2. reads the live bid/ask on the reference exchange (Binance or Coinbase);
 //   3. works out the gap both ways, minus the exchange fee and Arc gas, and stores it in D1.
+// For volatile Arc-native tokens with no exchange listing (ARGUS) it instead compares two Arc venues,
+// Uniswap v3 against Uniswap v4, by chaining real quotes: buy in one pool, sell the same tokens in the other.
 // The same Worker serves a small JSON API for the dashboard.
 
 const ARC_RPC = "https://rpc.mainnet.arc.io";
@@ -23,8 +25,26 @@ export const PAIRS = [
 const QUOTE_SELECTOR = "0xc6a5026a"; // quoteExactInputSingle((address,address,uint256,uint24,uint160))
 const GAS_UNITS = 110000n;          // typical v3 single swap on Arc, from QuoterV2's gasEstimate
 
+// Arc-vs-Arc pairs: the same token in a Uniswap v3 pool and in Uniswap v4 pools (chosen 31 Oct 2026 as the
+// v4 ARGUS/USDC pools with real liquidity and sane fees; the other ~170 are empty or charge 20-50%).
+const QUOTER_V4 = "0x8dc178efb8111bb0973dd9d722ebeff267c98f94"; // Uniswap V4Quoter on Arc
+const V4_SELECTOR = "0xaa9d21cb"; // quoteExactInputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))
+export const VENUE_PAIRS = [
+  { id: "ARGUS", token: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18, v3Fee: 10000,
+    v4: [ { fee: 9850, tickSpacing: 99, hooks: "0x0000000000000000000000000000000000000000", label: "v4 0.985%" },
+          { fee: 40000, tickSpacing: 200, hooks: "0x0000000000000000000000000000000000000000", label: "v4 4%" } ] },
+];
+
 const word = v => BigInt(v).toString(16).padStart(64, "0");
 const addrWord = a => a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
+
+// v4 pool key: currency0 is the lower address. Here USDC (0x36..) < token, so buying the token is zeroForOne.
+function quoteV4Call(token, pool, zeroForOne, amountIn) {
+  const [c0, c1] = USDC.toLowerCase() < token.toLowerCase() ? [USDC, token] : [token, USDC];
+  return V4_SELECTOR + word(32) + addrWord(c0) + addrWord(c1) + word(pool.fee) + word(pool.tickSpacing) + addrWord(pool.hooks)
+    + word(zeroForOne ? 1 : 0) + word(amountIn) + word(256) + word(0);
+}
+const firstWord = r => (r && r.length >= 66 ? BigInt(r.slice(0, 66)) : 0n);
 
 function quoteCall(tokenIn, tokenOut, amountIn, fee) {
   return QUOTE_SELECTOR + addrWord(tokenIn) + addrWord(tokenOut) + word(amountIn) + word(fee) + word(0);
@@ -141,6 +161,67 @@ export async function sample(env = {}) {
         if (!row.arc_buy && !row.arc_sell) row.error = arcError || "no arc quote";
       }
       rows.push(row);
+    }
+  }
+  rows.push(...await sampleVenues(ts, gasUsd, endpoints).catch(e => VENUE_PAIRS.flatMap(p => SIZES.map(usd => ({ ts, pair: p.id, size: usd,
+    ref_src: null, cex_bid: null, cex_ask: null, arc_buy: null, arc_sell: null, gross_a: null, gross_b: null, net_a: null, net_b: null,
+    net_best: null, would_trade: 0, cex_fee: 0, gas_usd: null, error: "arc: " + String(e.message || e).slice(0, 120) })))));
+  return rows;
+}
+
+// Buy on one Arc venue, sell the same tokens on the other: two rounds of quotes (the second leg needs the
+// first leg's output). Both legs settle on Arc, so there is no exchange fee and no transfer; only two swaps' gas.
+async function sampleVenues(ts, gasUsd, endpoints) {
+  const rows = [];
+  for (const p of VENUE_PAIRS) {
+    const usdcIsC0 = USDC.toLowerCase() < p.token.toLowerCase();
+    const r1 = [], plan1 = [];
+    for (const usd of SIZES) {
+      plan1.push({ usd, leg: "v3buy", idx: r1.length });
+      r1.push({ method: "eth_call", params: [{ to: QUOTER, data: quoteCall(USDC, p.token, units(usd, 6), p.v3Fee) }, "latest"] });
+      p.v4.forEach((pool, k) => { plan1.push({ usd, leg: "v4buy", k, idx: r1.length });
+        r1.push({ method: "eth_call", params: [{ to: QUOTER_V4, data: quoteV4Call(p.token, pool, usdcIsC0, units(usd, 6)) }, "latest"] }); });
+    }
+    const a = await rpcBatch(r1, endpoints);
+    const got = (usd, leg, k) => firstWord(a.out[plan1.find(x => x.usd === usd && x.leg === leg && x.k === k).idx]);
+    const r2 = [], plan2 = [];
+    for (const usd of SIZES) {
+      const v3tok = got(usd, "v3buy", undefined);
+      p.v4.forEach((pool, k) => {
+        const v4tok = got(usd, "v4buy", k);
+        if (v3tok > 0n) { plan2.push({ usd, k, leg: "sellV4", tokIn: v3tok, idx: r2.length });
+          r2.push({ method: "eth_call", params: [{ to: QUOTER_V4, data: quoteV4Call(p.token, pool, !usdcIsC0, v3tok) }, "latest"] }); }
+        if (v4tok > 0n) { plan2.push({ usd, k, leg: "sellV3", tokIn: v4tok, idx: r2.length });
+          r2.push({ method: "eth_call", params: [{ to: QUOTER, data: quoteCall(p.token, USDC, v4tok, p.v3Fee) }, "latest"] }); }
+      });
+    }
+    const b = r2.length ? await rpcBatch(r2, endpoints) : { out: [], lastErr: null };
+    const err = a.lastErr || b.lastErr;
+    for (const usd of SIZES) {
+      const costs = 2 * gasUsd / usd; // two swaps on Arc; pool fees and slippage are already inside the quotes
+      let best = null;
+      p.v4.forEach((pool, k) => {
+        const v3tok = got(usd, "v3buy", undefined), v4tok = got(usd, "v4buy", k);
+        const sA = plan2.find(x => x.usd === usd && x.k === k && x.leg === "sellV4");
+        const sB = plan2.find(x => x.usd === usd && x.k === k && x.leg === "sellV3");
+        const outA = sA ? fromUnits(firstWord(b.out[sA.idx]), 6) : 0; // buy v3, sell v4
+        const outB = sB ? fromUnits(firstWord(b.out[sB.idx]), 6) : 0; // buy v4, sell v3
+        const row = { ts, pair: p.id, size: usd, ref_src: "arc " + pool.label,
+          arc_buy: v3tok > 0n ? usd / fromUnits(v3tok, p.dec) : null,
+          arc_sell: outB && v4tok > 0n ? outB / fromUnits(v4tok, p.dec) : null,
+          cex_ask: v4tok > 0n ? usd / fromUnits(v4tok, p.dec) : null,
+          cex_bid: outA && v3tok > 0n ? outA / fromUnits(v3tok, p.dec) : null,
+          gross_a: outA ? outA / usd - 1 : null, gross_b: outB ? outB / usd - 1 : null,
+          net_a: null, net_b: null, net_best: null, would_trade: 0, cex_fee: 0, gas_usd: 2 * gasUsd, error: null };
+        if (row.gross_a !== null) row.net_a = row.gross_a - costs;
+        if (row.gross_b !== null) row.net_b = row.gross_b - costs;
+        const nets = [row.net_a, row.net_b].filter(v => v !== null);
+        if (nets.length) { row.net_best = Math.max(...nets); row.would_trade = row.net_best > 0 ? 1 : 0; }
+        if (row.net_best !== null && (!best || row.net_best > best.net_best)) best = row;
+      });
+      rows.push(best || { ts, pair: p.id, size: usd, ref_src: null, cex_bid: null, cex_ask: null, arc_buy: null, arc_sell: null,
+        gross_a: null, gross_b: null, net_a: null, net_b: null, net_best: null, would_trade: 0, cex_fee: 0, gas_usd: 2 * gasUsd,
+        error: err ? "arc: " + err.slice(0, 120) : "no arc quote" });
     }
   }
   return rows;

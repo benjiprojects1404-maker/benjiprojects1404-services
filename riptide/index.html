@@ -13,7 +13,7 @@
 :root{
   --paper:#F3F5F7; --sheet:#FFFFFF; --ink:#15212C; --muted:#5A6B78; --rule:#D3DBE2;
   --green:#0E6A4E; --green-tint:#E5F0EA; --red:#A33A2B; --red-tint:#F7E6E2;
-  --l1:#0E6A4E; --l2:#1F5FA8; --l3:#B5651D;
+  --l1:#0E6A4E; --l2:#1F5FA8; --l3:#B5651D; --l4:#8A3FA0;
   --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
 }
 *{box-sizing:border-box}
@@ -67,7 +67,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 
 <main>
   <h1>Riptide</h1>
-  <p class="lede">Every minute, Riptide asks Arc's Uniswap pools what a $10 and a $1,000 trade would really return, compares that with Binance and Coinbase, and logs every gap after fees. It is a paper-trading experiment: it never trades, holds no funds and has no keys.</p>
+  <p class="lede">Every minute, Riptide asks Arc's Uniswap pools what a $10 and a $1,000 trade would really return, compares that with Binance and Coinbase (or, for ARGUS, with Arc's other Uniswap pools), and logs every gap after fees. It is a paper-trading experiment: it never trades, holds no funds and has no keys.</p>
 
   <div class="notice" id="setupNotice" hidden>The monitor isn't connected yet. Once the Riptide Worker is deployed, live numbers appear here.</div>
 
@@ -82,7 +82,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
     <h2>Right now</h2>
     <p class="sub" id="latestSub">Latest check</p>
     <div class="tablewrap"><table>
-      <thead><tr><th>Pair</th><th class="n">Size</th><th class="n">Arc buy</th><th class="n">Arc sell</th><th class="n">Exchange bid / ask</th><th>Source</th><th class="n">Best gap</th><th class="n">After costs</th><th>Would trade?</th></tr></thead>
+      <thead><tr><th>Pair</th><th class="n">Size</th><th class="n">Arc buy</th><th class="n">Arc sell</th><th class="n">Compared with: bid / ask</th><th>Against</th><th class="n">Best gap</th><th class="n">After costs</th><th>Would trade?</th></tr></thead>
       <tbody id="latestBody"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </section>
@@ -122,6 +122,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
     <ul class="plain">
       <li><b>Arc prices are real quotes</b> from Uniswap v3's QuoterV2, so they already include the pool fee and the slippage for that trade size.</li>
       <li><b>Exchange prices</b> are the best bid and ask: Binance BTC/USDC and ETH/USDC where reachable, otherwise Coinbase BTC/USD and ETH/USD (USDC converts 1:1 to USD there), and Coinbase EURC/USDC (Binance has no EURC market). Binance blocks some server regions, including the one Riptide runs in, so Coinbase is usually the reference.</li>
+      <li><b>ARGUS is compared Arc against Arc:</b> it has no exchange listing, so Riptide buys in Arc's Uniswap v3 pool and sells the same tokens in a Uniswap v4 pool (and the reverse), using chained real quotes. Both legs settle on Arc, so there's no exchange fee and no transfer, only the two pools' fees (about 1% each) and two swaps' gas. It only watches the v4 pools with real liquidity and normal fees; most of the ~170 ARGUS/USDC v4 pools are empty or charge 20–50%.</li>
       <li><b>Costs subtracted:</b> the exchange's taker fee (assumed <span id="feeList">0.1% Binance, 0.6% Coinbase</span>; your own tier may be lower) and Arc network fees at the live gas price.</li>
       <li><b>Not counted:</b> moving funds between Arc and an exchange. Withdrawal and bridge fees, and the minutes or hours a transfer takes, are usually the real barrier, so a "would trade" here is an upper bound, not a promise.</li>
       <li><b>cirBTC is not BTC</b> and WETH is not ETH: they're Circle's and a bridge's wrapped versions on Arc, priced against the real thing.</li>
@@ -140,7 +141,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 // Set this to the deployed Worker's address. ?api=https://... overrides it for testing.
 const DEFAULT_API = "https://riptide.benjiprojects1404.workers.dev";
 const API = (new URLSearchParams(location.search).get("api") || DEFAULT_API).replace(/\/$/, "");
-const COLORS = { cirBTC: "var(--l1)", EURC: "var(--l2)", WETH: "var(--l3)" };
+const COLORS = { cirBTC: "var(--l1)", EURC: "var(--l2)", WETH: "var(--l3)", ARGUS: "var(--l4)" };
 const $ = id => document.getElementById(id);
 const pct = (v, d = 2) => v == null ? "–" : (v * 100).toFixed(d) + "%";
 const sPct = v => v == null ? "–" : `<span class="${v > 0 ? "pos" : "neg"}">${v > 0 ? "+" : ""}${(v * 100).toFixed(2)}%</span>`;
@@ -164,14 +165,14 @@ async function loadLatest() {
   const rows = j.rows || [];
   if (!rows.length) { $("latestBody").innerHTML = `<tr><td colspan="8" class="empty">No checks yet. The first one lands within a minute of deploying.</td></tr>`; return null; }
   const SRC = { binance: "Binance", "binance-mirror": "Binance", coinbase: "Coinbase" };
-  const fees = [...new Map(rows.filter(r => r.ref_src).map(r => [r.pair, `${(r.cex_fee * 100).toFixed(1)}% ${SRC[r.ref_src] || r.ref_src} (${esc(r.pair)})`])).values()];
+  const fees = [...new Map(rows.filter(r => r.ref_src && !r.ref_src.startsWith("arc")).map(r => [r.pair, `${(r.cex_fee * 100).toFixed(1)}% ${SRC[r.ref_src] || r.ref_src} (${esc(r.pair)})`])).values()];
   if (fees.length) $("feeList").textContent = fees.join(", ");
   $("latestSub").textContent = "Latest check: " + when(rows[0].ts);
   $("latestBody").innerHTML = rows.map(r => {
     if (r.error) return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size}</td><td colspan="7" class="no">Not available this minute (${esc(r.error)})</td></tr>`;
     const best = Math.max(r.gross_a ?? -1, r.gross_b ?? -1);
     return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size.toLocaleString("en-GB")}</td><td class="n">${price(r.arc_buy)}</td><td class="n">${price(r.arc_sell)}</td>
-      <td class="n">${price(r.cex_bid)} / ${price(r.cex_ask)}</td><td>${esc(SRC[r.ref_src] || r.ref_src || "–")}</td><td class="n">${pct(best)}</td><td class="n">${sPct(r.net_best)}</td>
+      <td class="n">${price(r.cex_bid)} / ${price(r.cex_ask)}</td><td>${esc(SRC[r.ref_src] || (r.ref_src || "–").replace(/^arc /, "Arc "))}</td><td class="n">${pct(best)}</td><td class="n">${sPct(r.net_best)}</td>
       <td>${r.would_trade ? '<span class="yes">Yes</span>' : '<span class="no">No</span>'}</td></tr>`;
   }).join("");
   return rows[0].ts;
