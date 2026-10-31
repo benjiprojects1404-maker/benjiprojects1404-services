@@ -82,8 +82,8 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
     <h2>Right now</h2>
     <p class="sub" id="latestSub">Latest check</p>
     <div class="tablewrap"><table>
-      <thead><tr><th>Pair</th><th class="n">Size</th><th class="n">Arc buy</th><th class="n">Arc sell</th><th class="n">Exchange bid / ask</th><th class="n">Best gap</th><th class="n">After costs</th><th>Would trade?</th></tr></thead>
-      <tbody id="latestBody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+      <thead><tr><th>Pair</th><th class="n">Size</th><th class="n">Arc buy</th><th class="n">Arc sell</th><th class="n">Exchange bid / ask</th><th>Source</th><th class="n">Best gap</th><th class="n">After costs</th><th>Would trade?</th></tr></thead>
+      <tbody id="latestBody"><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
     </table></div>
   </section>
 
@@ -121,7 +121,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
     <h2>How it counts, and what it leaves out</h2>
     <ul class="plain">
       <li><b>Arc prices are real quotes</b> from Uniswap v3's QuoterV2, so they already include the pool fee and the slippage for that trade size.</li>
-      <li><b>Exchange prices</b> are the best bid and ask: Binance BTC/USDC and ETH/USDC, and Coinbase EURC/USDC (Binance has no EURC market).</li>
+      <li><b>Exchange prices</b> are the best bid and ask: Binance BTC/USDC and ETH/USDC where reachable, otherwise Coinbase BTC/USD and ETH/USD (USDC converts 1:1 to USD there), and Coinbase EURC/USDC (Binance has no EURC market). Binance blocks some server regions, including the one Riptide runs in, so Coinbase is usually the reference.</li>
       <li><b>Costs subtracted:</b> the exchange's taker fee (assumed <span id="feeList">0.1% Binance, 0.6% Coinbase</span>; your own tier may be lower) and Arc network fees at the live gas price.</li>
       <li><b>Not counted:</b> moving funds between Arc and an exchange. Withdrawal and bridge fees, and the minutes or hours a transfer takes, are usually the real barrier, so a "would trade" here is an upper bound, not a promise.</li>
       <li><b>cirBTC is not BTC</b> and WETH is not ETH: they're Circle's and a bridge's wrapped versions on Arc, priced against the real thing.</li>
@@ -163,14 +163,15 @@ async function loadLatest() {
   const j = await get("/api/latest");
   const rows = j.rows || [];
   if (!rows.length) { $("latestBody").innerHTML = `<tr><td colspan="8" class="empty">No checks yet. The first one lands within a minute of deploying.</td></tr>`; return null; }
-  const fees = (j.pairs || []).map(p => `${(p.cexFee * 100).toFixed(1)}% ${p.ref === "coinbase" ? "Coinbase" : "Binance"} (${esc(p.id)})`);
+  const SRC = { binance: "Binance", "binance-mirror": "Binance", coinbase: "Coinbase" };
+  const fees = [...new Map(rows.filter(r => r.ref_src).map(r => [r.pair, `${(r.cex_fee * 100).toFixed(1)}% ${SRC[r.ref_src] || r.ref_src} (${esc(r.pair)})`])).values()];
   if (fees.length) $("feeList").textContent = fees.join(", ");
   $("latestSub").textContent = "Latest check: " + when(rows[0].ts);
   $("latestBody").innerHTML = rows.map(r => {
-    if (r.error) return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size}</td><td colspan="6" class="no">Not available this minute (${esc(r.error)})</td></tr>`;
+    if (r.error) return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size}</td><td colspan="7" class="no">Not available this minute (${esc(r.error)})</td></tr>`;
     const best = Math.max(r.gross_a ?? -1, r.gross_b ?? -1);
     return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size.toLocaleString("en-GB")}</td><td class="n">${price(r.arc_buy)}</td><td class="n">${price(r.arc_sell)}</td>
-      <td class="n">${price(r.cex_bid)} / ${price(r.cex_ask)}</td><td class="n">${pct(best)}</td><td class="n">${sPct(r.net_best)}</td>
+      <td class="n">${price(r.cex_bid)} / ${price(r.cex_ask)}</td><td>${esc(SRC[r.ref_src] || r.ref_src || "–")}</td><td class="n">${pct(best)}</td><td class="n">${sPct(r.net_best)}</td>
       <td>${r.would_trade ? '<span class="yes">Yes</span>' : '<span class="no">No</span>'}</td></tr>`;
   }).join("");
   return rows[0].ts;
