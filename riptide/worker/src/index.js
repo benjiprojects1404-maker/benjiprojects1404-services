@@ -9,6 +9,8 @@
 // Uniswap v3 against Uniswap v4, by chaining real quotes: buy in one pool, sell the same tokens in the other.
 // The same Worker serves a small JSON API for the dashboard.
 
+import { ensureSchema, checkPools, pausedPairs, PAUSE_MIN, PRICE_DROP, LIQ_DROP } from "./rug.js";
+
 const ARC_RPC = "https://rpc.mainnet.arc.io";
 const QUOTER = "0x7dfd4f31be6814d2906bde155c3e1b146eac1468"; // Uniswap QuoterV2 on Arc (chain 5042)
 const USDC = "0x3600000000000000000000000000000000000000";    // USDC ERC-20 interface, 6 decimals
@@ -227,7 +229,7 @@ async function sampleVenues(ts, gasUsd, endpoints) {
   return rows;
 }
 
-const COLS = ["ts", "pair", "size", "ref_src", "cex_bid", "cex_ask", "arc_buy", "arc_sell", "gross_a", "gross_b", "net_a", "net_b", "net_best", "would_trade", "cex_fee", "gas_usd", "error"];
+const COLS = ["ts", "pair", "size", "ref_src", "cex_bid", "cex_ask", "arc_buy", "arc_sell", "gross_a", "gross_b", "net_a", "net_b", "net_best", "would_trade", "cex_fee", "gas_usd", "error", "alert"];
 
 async function store(env, rows) {
   const stmt = env.DB.prepare(`INSERT INTO samples (${COLS.join(",")}) VALUES (${COLS.map(() => "?").join(",")})`);
@@ -244,7 +246,8 @@ async function api(url, env) {
 
   if (p === "/api/latest") {
     const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts = (SELECT MAX(ts) FROM samples) ORDER BY pair, size`).all();
-    return json({ rows: r.results, pairs: PAIRS.map(({ id, ref, sym, cexFee, poolFee }) => ({ id, ref, sym, cexFee, poolFee })) });
+    return json({ rows: r.results, pairs: PAIRS.map(({ id, ref, sym, cexFee, poolFee }) => ({ id, ref, sym, cexFee, poolFee })),
+      rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
   }
   if (p === "/api/summary") {
     const r = await env.DB.prepare(`SELECT pair, size, COUNT(*) n, SUM(would_trade) hits, MAX(net_best) best_net,
@@ -265,23 +268,39 @@ async function api(url, env) {
     const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts >= ? AND would_trade = 1 ORDER BY ts DESC LIMIT 200`).bind(since).all();
     return json({ rows: r.results });
   }
+  if (p === "/api/events") {
+    let r = { results: [] };
+    try { r = await env.DB.prepare(`SELECT * FROM events WHERE ts >= ? ORDER BY ts DESC LIMIT 200`).bind(since).all(); } catch (_) { /* table not created yet */ }
+    return json({ rows: r.results, rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
+  }
   if (p === "/api/csv") {
     const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts >= ? ORDER BY ts`).bind(since).all();
     const lines = [COLS.join(",")].concat(r.results.map(x => COLS.map(c => x[c] ?? "").join(",")));
     return new Response(lines.join("\n"), { headers: { "content-type": "text/csv", "content-disposition": `attachment; filename=riptide-${days}d.csv`, ...CORS } });
   }
-  return json({ name: "Riptide", endpoints: ["/api/latest", "/api/summary?days=7", "/api/series?days=7&size=1000", "/api/opps?days=7", "/api/csv?days=7"] });
+  return json({ name: "Riptide", endpoints: ["/api/latest", "/api/summary?days=7", "/api/series?days=7&size=1000", "/api/opps?days=7", "/api/events?days=7", "/api/csv?days=7"] });
 }
+
+let schemaReady = false;
 
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil((async () => {
+      if (!schemaReady) { await ensureSchema(env); schemaReady = true; }
       const rows = await sample(env);
+      const ts = rows[0] ? rows[0].ts : Math.floor(Date.now() / 1000);
+      // Rug alarm: read every watched pool, log sudden price drops / liquidity pulls, pause those pairs.
+      const endpoints = [env.ARC_RPC_URL, ARC_RPC].filter(Boolean);
+      const events = await checkPools(env, ts, rpcBatch, endpoints).catch(e => { console.log("rug check failed: " + (e.message || e)); return []; });
+      const paused = await pausedPairs(env, ts);
+      for (const r of rows) { const p = paused.get(r.pair); if (p) { r.alert = "paused: " + p.kind; r.would_trade = 0; } else r.alert = null; }
       await store(env, rows);
       const errs = [...new Set(rows.map(r => r.error).filter(Boolean))];
-      console.log(`riptide: saved ${rows.length} rows` + (errs.length ? `; issues: ${errs.join(" | ")}` : "; all sources ok"));
+      console.log(`riptide: saved ${rows.length} rows` + (errs.length ? `; issues: ${errs.join(" | ")}` : "; all sources ok")
+        + (events.length ? `; ALARM: ${events.map(e => `${e.w.pair} ${e.w.pool} ${e.kind} ${(e.change * 100).toFixed(0)}%`).join(", ")}` : ""));
       // Keep 30 days.
-      await env.DB.prepare(`DELETE FROM samples WHERE ts < ?`).bind(Math.floor(Date.now() / 1000) - 30 * 86400).run();
+      const cutoff = Math.floor(Date.now() / 1000) - 30 * 86400;
+      await env.DB.batch(["samples", "pool_state", "events"].map(t => env.DB.prepare(`DELETE FROM ${t} WHERE ts < ?`).bind(cutoff)));
     })());
   },
   async fetch(req, env) {

@@ -38,6 +38,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .pos{color:var(--green);font-weight:600} .neg{color:var(--red)}
 .yes{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--green-tint);color:var(--green);font-size:12px;font-weight:600}
 .no{color:var(--muted);font-size:12px}
+.warn{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--red-tint);color:var(--red);font-size:12px;font-weight:600}
 .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .seg button{border:1px solid var(--rule);background:var(--sheet);padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
 .seg button:first-child{border-radius:8px 0 0 8px} .seg button:last-child{border-radius:0 8px 8px 0} .seg button+button{border-left:none}
@@ -118,11 +119,21 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
   </section>
 
   <section class="card">
+    <h2>Rug alarm</h2>
+    <p class="sub" id="rugSub">Every watched pool is read each minute. A sudden price drop or a large share of liquidity pulled between two checks is logged here, and that pair is paused so it can't count as a trade.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Time</th><th>Pair</th><th>Pool</th><th>What happened</th><th class="n">Change</th></tr></thead>
+      <tbody id="rugBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
     <h2>How it counts, and what it leaves out</h2>
     <ul class="plain">
       <li><b>Arc prices are real quotes</b> from Uniswap v3's QuoterV2, so they already include the pool fee and the slippage for that trade size.</li>
       <li><b>Exchange prices</b> are the best bid and ask: Binance BTC/USDC and ETH/USDC where reachable, otherwise Coinbase BTC/USD and ETH/USD (USDC converts 1:1 to USD there), and Coinbase EURC/USDC (Binance has no EURC market). Binance blocks some server regions, including the one Riptide runs in, so Coinbase is usually the reference.</li>
       <li><b>ARGUS is compared Arc against Arc:</b> it has no exchange listing, so Riptide buys in Arc's Uniswap v3 pool and sells the same tokens in a Uniswap v4 pool (and the reverse), using chained real quotes. Both legs settle on Arc, so there's no exchange fee and no transfer, only the two pools' fees (about 1% each) and two swaps' gas. It only watches the v4 pools with real liquidity and normal fees; most of the ~170 ARGUS/USDC v4 pools are empty or charge 20–50%.</li>
+      <li><b>Rug alarm:</b> on a DEX a rug pull happens in a single transaction, far faster than any stop-loss can react, so Riptide doesn't pretend to exit. It flags the warning signs instead and pauses the pair, because a huge "gap" during a rug is a trap, not an opportunity.</li>
       <li><b>Costs subtracted:</b> the exchange's taker fee (assumed <span id="feeList">0.1% Binance, 0.6% Coinbase</span>; your own tier may be lower) and Arc network fees at the live gas price.</li>
       <li><b>Not counted:</b> moving funds between Arc and an exchange. Withdrawal and bridge fees, and the minutes or hours a transfer takes, are usually the real barrier, so a "would trade" here is an upper bound, not a promise.</li>
       <li><b>cirBTC is not BTC</b> and WETH is not ETH: they're Circle's and a bridge's wrapped versions on Arc, priced against the real thing.</li>
@@ -173,7 +184,7 @@ async function loadLatest() {
     const best = Math.max(r.gross_a ?? -1, r.gross_b ?? -1);
     return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size.toLocaleString("en-GB")}</td><td class="n">${price(r.arc_buy)}</td><td class="n">${price(r.arc_sell)}</td>
       <td class="n">${price(r.cex_bid)} / ${price(r.cex_ask)}</td><td>${esc(SRC[r.ref_src] || (r.ref_src || "–").replace(/^arc /, "Arc "))}</td><td class="n">${pct(best)}</td><td class="n">${sPct(r.net_best)}</td>
-      <td>${r.would_trade ? '<span class="yes">Yes</span>' : '<span class="no">No</span>'}</td></tr>`;
+      <td>${r.alert ? '<span class="warn">Paused: possible rug</span>' : r.would_trade ? '<span class="yes">Yes</span>' : '<span class="no">No</span>'}</td></tr>`;
   }).join("");
   return rows[0].ts;
 }
@@ -205,6 +216,16 @@ async function loadOpps() {
     return `<tr><td>${when(r.ts)}</td><td>${esc(r.pair)}</td><td class="n">$${r.size.toLocaleString("en-GB")}</td><td>${dir}</td><td class="n">${sPct(r.net_best)}</td><td class="n">${money(r.net_best * r.size)}</td></tr>`;
   }).join("") : `<tr><td colspan="6" class="empty">None in this period: no gap beat all the costs.</td></tr>`;
   $("csvLink").href = `${API}/api/csv?days=${days}`;
+}
+
+const KIND = { price_drop: "Price dropped", liquidity_drop: "Liquidity pulled", pool_empty: "Pool emptied" };
+async function loadEvents() {
+  const j = await get(`/api/events?days=${days}`);
+  const a = j.rugAlarm;
+  if (a) $("rugSub").textContent = `Every watched pool is read each minute. A price drop of ${Math.round(a.priceDrop * 100)}% or more, or ${Math.round(a.liquidityDrop * 100)}% or more of a pool's liquidity pulled, between two checks is logged here, and that pair is paused for ${a.pauseMinutes} minutes so it can't count as a trade.`;
+  const rows = j.rows || [];
+  $("rugBody").innerHTML = rows.length ? rows.map(r => `<tr><td>${when(r.ts)}</td><td>${esc(r.pair)}</td><td>${esc(r.pool)}</td><td>${KIND[r.kind] || esc(r.kind)}</td><td class="n"><span class="neg">${(r.change * 100).toFixed(0)}%</span></td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">No alarms in this period.</td></tr>`;
 }
 
 async function loadChart() {
@@ -255,7 +276,7 @@ async function refresh(withLatest = true) {
   try {
     if (API.includes("REPLACE_WITH")) throw new Error("not configured");
     const last = withLatest ? await loadLatest() : true;
-    await Promise.all([loadSummary(), loadOpps(), loadChart()]);
+    await Promise.all([loadSummary(), loadOpps(), loadChart(), loadEvents().catch(() => {})]);
     $("setupNotice").hidden = true;
     const fresh = last && last !== true && Date.now() / 1000 - last < 300;
     $("statusPill").textContent = last === null ? "Waiting for first check" : fresh ? "Live · checks every minute" : last === true ? $("statusPill").textContent : "Paused";
@@ -263,7 +284,7 @@ async function refresh(withLatest = true) {
   } catch (e) {
     $("setupNotice").hidden = false;
     $("statusPill").textContent = "Not connected";
-    for (const id of ["latestBody", "sumBody", "oppBody"]) $(id).innerHTML = `<tr><td colspan="8" class="empty">Waiting for the monitor.</td></tr>`;
+    for (const id of ["latestBody", "sumBody", "oppBody", "rugBody"]) $(id).innerHTML = `<tr><td colspan="8" class="empty">Waiting for the monitor.</td></tr>`;
   }
 }
 refresh();
