@@ -77,7 +77,9 @@ export async function sample() {
       calls.push({ method: "eth_call", params: [{ to: QUOTER, data: quoteCall(p.token, USDC, units(usd / mid, p.dec), p.poolFee) }, "latest"] });
     }
   });
-  const res = await rpcBatch(calls);
+  // If Arc can't be reached, still log the minute with the reason instead of saving nothing.
+  let res = [], arcError = null;
+  try { res = await rpcBatch(calls); } catch (e) { arcError = "arc: " + String(e.message || e).slice(0, 120); }
   const gasPrice = res[0] ? BigInt(res[0]) : 20000000000n;
   const gasUsd = Number(GAS_UNITS * gasPrice) / 1e18; // native USDC has 18 decimals
 
@@ -87,8 +89,8 @@ export async function sample() {
     for (const usd of SIZES) {
       const row = { ts, pair: p.id, size: usd, ref_src: ref.src || null, cex_bid: ref.bid ?? null, cex_ask: ref.ask ?? null,
         arc_buy: null, arc_sell: null, gross_a: null, gross_b: null, net_a: null, net_b: null, net_best: null, would_trade: 0,
-        cex_fee: p.cexFee, gas_usd: gasUsd, error: ref.error || null };
-      if (!ref.error) {
+        cex_fee: p.cexFee, gas_usd: gasUsd, error: ref.error || arcError || null };
+      if (!row.error) {
         const b = plan.find(x => x.i === i && x.usd === usd && x.dir === "buy");
         const s = plan.find(x => x.i === i && x.usd === usd && x.dir === "sell");
         const outTok = res[b.idx] && res[b.idx].length >= 66 ? fromUnits(BigInt(res[b.idx].slice(0, 66)), p.dec) : 0;
@@ -159,6 +161,8 @@ export default {
     ctx.waitUntil((async () => {
       const rows = await sample();
       await store(env, rows);
+      const errs = [...new Set(rows.map(r => r.error).filter(Boolean))];
+      console.log(`riptide: saved ${rows.length} rows` + (errs.length ? `; issues: ${errs.join(" | ")}` : "; all sources ok"));
       // Keep 30 days.
       await env.DB.prepare(`DELETE FROM samples WHERE ts < ?`).bind(Math.floor(Date.now() / 1000) - 30 * 86400).run();
     })());

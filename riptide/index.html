@@ -138,7 +138,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 <script>
 "use strict";
 // Set this to the deployed Worker's address. ?api=https://... overrides it for testing.
-const DEFAULT_API = "https://riptide.REPLACE_WITH_YOUR_SUBDOMAIN.workers.dev";
+const DEFAULT_API = "https://riptide.benjiprojects1404.workers.dev";
 const API = (new URLSearchParams(location.search).get("api") || DEFAULT_API).replace(/\/$/, "");
 const COLORS = { cirBTC: "var(--l1)", EURC: "var(--l2)", WETH: "var(--l3)" };
 const $ = id => document.getElementById(id);
