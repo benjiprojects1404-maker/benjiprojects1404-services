@@ -1,0 +1,14 @@
+name = "riptide"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Runs every minute.
+[triggers]
+crons = ["* * * * *"]
+
+# Create the database once with:  npx wrangler d1 create riptide
+# then paste the database_id it prints below.
+[[d1_databases]]
+binding = "DB"
+database_name = "riptide"
+database_id = "PASTE_DATABASE_ID_HERE"

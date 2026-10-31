@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Riptide · Arc price-gap monitor</title>
+<meta name="description" content="Riptide watches Arc's Uniswap pools against Binance and Coinbase every minute and logs every price gap after real costs. Paper trading only: it never trades.">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Spectral:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F5F7; --sheet:#FFFFFF; --ink:#15212C; --muted:#5A6B78; --rule:#D3DBE2;
+  --green:#0E6A4E; --green-tint:#E5F0EA; --red:#A33A2B; --red-tint:#F7E6E2;
+  --l1:#0E6A4E; --l2:#1F5FA8; --l3:#B5651D;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 "Public Sans",system-ui,sans-serif}
+h1,h2,h3{font-family:"Spectral",Georgia,serif;font-weight:600;line-height:1.15;margin:0;letter-spacing:-.01em}
+a{color:var(--green)}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--sheet)}
+.brand{font-family:"Spectral",Georgia,serif;font-weight:700;font-size:20px;color:var(--ink);text-decoration:none}
+.spacer{flex:1}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--rule);color:var(--muted);white-space:nowrap}
+.pill.live{border-color:#9cc9b4;background:var(--green-tint);color:var(--green)}
+main{max-width:980px;margin:0 auto;padding:28px 16px 40px}
+h1{font-size:44px} .lede{color:var(--muted);max-width:680px;margin:10px 0 22px}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:20px;margin-bottom:18px}
+.card h2{font-size:26px;margin-bottom:4px} .sub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.notice{border-left:3px solid var(--green);background:var(--green-tint);padding:10px 14px;border-radius:6px;font-size:14px;margin-bottom:18px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:8px 8px;border-bottom:1px solid var(--rule);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12.5px}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--green);font-weight:600} .neg{color:var(--red)}
+.yes{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--green-tint);color:var(--green);font-size:12px;font-weight:600}
+.no{color:var(--muted);font-size:12px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.seg button{border:1px solid var(--rule);background:var(--sheet);padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+.seg button:first-child{border-radius:8px 0 0 8px} .seg button:last-child{border-radius:0 8px 8px 0} .seg button+button{border-left:none}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.seg{display:inline-flex}
+#chart{width:100%;height:300px;display:block}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-top:8px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.stat{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-family:"Spectral",Georgia,serif;font-size:28px;font-weight:600;line-height:1.1}
+.stat span{color:var(--muted);font-size:12.5px}
+ul.plain{margin:0;padding-left:18px} ul.plain li{margin:4px 0}
+.mono{font-family:var(--mono);font-size:12.5px}
+.btn{display:inline-block;border:1px solid var(--rule);background:var(--sheet);border-radius:8px;padding:7px 12px;font-size:13px;text-decoration:none;color:var(--ink)}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font-size:12.5px}
+@media (max-width:700px){ h1{font-size:34px} .stats{grid-template-columns:repeat(2,1fr)} }
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="../">benjiprojects1404</a>
+  <span class="spacer"></span>
+  <span class="pill" id="statusPill">Connecting…</span>
+</header>
+
+<main>
+  <h1>Riptide</h1>
+  <p class="lede">Every minute, Riptide asks Arc's Uniswap pools what a $10 and a $1,000 trade would really return, compares that with Binance and Coinbase, and logs every gap after fees. It is a paper-trading experiment: it never trades, holds no funds and has no keys.</p>
+
+  <div class="notice" id="setupNotice" hidden>The monitor isn't connected yet. Once the Riptide Worker is deployed, live numbers appear here.</div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><b id="sRunning">–</b><span>running for</span></div>
+    <div class="stat"><b id="sSamples">–</b><span>checks logged (this period)</span></div>
+    <div class="stat"><b id="sHits">–</b><span>gaps that beat all costs</span></div>
+    <div class="stat"><b id="sPnl">–</b><span>paper result, $1,000 size</span></div>
+  </div>
+
+  <section class="card">
+    <h2>Right now</h2>
+    <p class="sub" id="latestSub">Latest check</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Pair</th><th class="n">Size</th><th class="n">Arc buy</th><th class="n">Arc sell</th><th class="n">Exchange bid / ask</th><th class="n">Best gap</th><th class="n">After costs</th><th>Would trade?</th></tr></thead>
+      <tbody id="latestBody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>Gap after costs, over time</h2>
+    <p class="sub">15-minute averages. Above the zero line means a trade would have made money after fees; below means it would have lost.</p>
+    <div class="controls">
+      <div class="seg" id="sizeSeg"><button data-v="10">$10</button><button data-v="1000" aria-pressed="true">$1,000</button></div>
+      <div class="seg" id="daysSeg"><button data-v="1">24 h</button><button data-v="7" aria-pressed="true">7 days</button><button data-v="30">30 days</button></div>
+    </div>
+    <svg id="chart" role="img" aria-label="Gap after costs over time for each pair"></svg>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section class="card">
+    <h2>Totals by pair</h2>
+    <p class="sub" id="sumSub">For the selected period.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Pair</th><th class="n">Size</th><th class="n">Checks</th><th class="n">Would trade</th><th class="n">Share of time</th><th class="n">Average best gap</th><th class="n">Best after costs</th><th class="n">Paper result</th></tr></thead>
+      <tbody id="sumBody"><tr><td colspan="8" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
+    <h2>Moments it would have traded</h2>
+    <p class="sub">Newest first, up to 200. Each one is a single check where a gap beat every cost counted below.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Time</th><th>Pair</th><th class="n">Size</th><th>Direction</th><th class="n">After costs</th><th class="n">Paper result</th></tr></thead>
+      <tbody id="oppBody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+    <p style="margin:14px 0 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="oppMore" hidden style="cursor:pointer;font:inherit;font-size:13px">Show all</button><a class="btn" id="csvLink" href="#">Download all checks (CSV)</a></p>
+  </section>
+
+  <section class="card">
+    <h2>How it counts, and what it leaves out</h2>
+    <ul class="plain">
+      <li><b>Arc prices are real quotes</b> from Uniswap v3's QuoterV2, so they already include the pool fee and the slippage for that trade size.</li>
+      <li><b>Exchange prices</b> are the best bid and ask: Binance BTC/USDC and ETH/USDC, and Coinbase EURC/USDC (Binance has no EURC market).</li>
+      <li><b>Costs subtracted:</b> the exchange's taker fee (assumed <span id="feeList">0.1% Binance, 0.6% Coinbase</span>; your own tier may be lower) and Arc network fees at the live gas price.</li>
+      <li><b>Not counted:</b> moving funds between Arc and an exchange. Withdrawal and bridge fees, and the minutes or hours a transfer takes, are usually the real barrier, so a "would trade" here is an upper bound, not a promise.</li>
+      <li><b>cirBTC is not BTC</b> and WETH is not ETH: they're Circle's and a bridge's wrapped versions on Arc, priced against the real thing.</li>
+      <li><b>The WETH pool on Arc is very small</b>, so its $1,000 numbers mostly show slippage in a shallow pool.</li>
+      <li>Read-only and public. No wallet, keys or exchange accounts are involved. Not financial advice.</li>
+    </ul>
+  </section>
+</main>
+
+<footer>
+  Riptide by benjiprojects1404 · Data: Arc mainnet (Uniswap v3), Binance and Coinbase public APIs · <a href="https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/riptide">Source</a> · Sister tool: <a href="https://chordotc.com/crescent/">Crescent</a>
+</footer>
+
+<script>
+"use strict";
+// Set this to the deployed Worker's address. ?api=https://... overrides it for testing.
+const DEFAULT_API = "https://riptide.REPLACE_WITH_YOUR_SUBDOMAIN.workers.dev";
+const API = (new URLSearchParams(location.search).get("api") || DEFAULT_API).replace(/\/$/, "");
+const COLORS = { cirBTC: "var(--l1)", EURC: "var(--l2)", WETH: "var(--l3)" };
+const $ = id => document.getElementById(id);
+const pct = (v, d = 2) => v == null ? "–" : (v * 100).toFixed(d) + "%";
+const sPct = v => v == null ? "–" : `<span class="${v > 0 ? "pos" : "neg"}">${v > 0 ? "+" : ""}${(v * 100).toFixed(2)}%</span>`;
+const money = v => v == null ? "–" : (v < 0 ? "−$" : "$") + Math.abs(v).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const price = v => v == null ? "–" : v >= 100 ? v.toLocaleString("en-GB", { maximumFractionDigits: 2 }) : v.toFixed(5);
+const when = t => new Date(t * 1000).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+let size = 1000, days = 7, showAllOpps = false;
+const FLOOR = -0.03; // chart bottom: anything worse than -3% is drawn at the edge and labelled
+
+async function get(path) { const r = await fetch(API + path); if (!r.ok) throw new Error(r.status); return r.json(); }
+
+function dur(sec) {
+  if (sec < 3600) return Math.max(1, Math.round(sec / 60)) + " min";
+  if (sec < 86400 * 2) return Math.round(sec / 3600) + " h";
+  return (sec / 86400).toFixed(1) + " days";
+}
+
+async function loadLatest() {
+  const j = await get("/api/latest");
+  const rows = j.rows || [];
+  if (!rows.length) { $("latestBody").innerHTML = `<tr><td colspan="8" class="empty">No checks yet. The first one lands within a minute of deploying.</td></tr>`; return null; }
+  const fees = (j.pairs || []).map(p => `${(p.cexFee * 100).toFixed(1)}% ${p.ref === "coinbase" ? "Coinbase" : "Binance"} (${esc(p.id)})`);
+  if (fees.length) $("feeList").textContent = fees.join(", ");
+  $("latestSub").textContent = "Latest check: " + when(rows[0].ts);
+  $("latestBody").innerHTML = rows.map(r => {
+    if (r.error) return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size}</td><td colspan="6" class="no">Not available this minute (${esc(r.error)})</td></tr>`;
+    const best = Math.max(r.gross_a ?? -1, r.gross_b ?? -1);
+    return `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size.toLocaleString("en-GB")}</td><td class="n">${price(r.arc_buy)}</td><td class="n">${price(r.arc_sell)}</td>
+      <td class="n">${price(r.cex_bid)} / ${price(r.cex_ask)}</td><td class="n">${pct(best)}</td><td class="n">${sPct(r.net_best)}</td>
+      <td>${r.would_trade ? '<span class="yes">Yes</span>' : '<span class="no">No</span>'}</td></tr>`;
+  }).join("");
+  return rows[0].ts;
+}
+
+async function loadSummary() {
+  const j = await get(`/api/summary?days=${days}`);
+  const rows = j.rows || [];
+  $("sumSub").textContent = `Last ${days === 1 ? "24 hours" : days + " days"}.`;
+  let n = 0, hits = 0, pnl1000 = 0;
+  for (const r of rows) { n += r.n; hits += r.hits || 0; if (r.size === 1000) pnl1000 += r.paper_pnl || 0; }
+  $("sSamples").textContent = n.toLocaleString("en-GB");
+  $("sHits").textContent = hits.toLocaleString("en-GB");
+  $("sPnl").textContent = money(pnl1000);
+  if (j.started) $("sRunning").textContent = dur(Date.now() / 1000 - j.started);
+  $("sumBody").innerHTML = rows.length ? rows.map(r => `<tr><td>${esc(r.pair)}</td><td class="n">$${r.size.toLocaleString("en-GB")}</td><td class="n">${r.n.toLocaleString("en-GB")}</td>
+    <td class="n">${(r.hits || 0).toLocaleString("en-GB")}</td><td class="n">${pct((r.hits || 0) / r.n, 1)}</td><td class="n">${pct(r.avg_best_gross)}</td>
+    <td class="n">${sPct(r.best_net)}</td><td class="n">${money(r.paper_pnl || 0)}</td></tr>`).join("")
+    : `<tr><td colspan="8" class="empty">No checks in this period yet.</td></tr>`;
+}
+
+async function loadOpps() {
+  const j = await get(`/api/opps?days=${days}`);
+  const rows = j.rows || [];
+  const shown = showAllOpps ? rows : rows.slice(0, 20);
+  $("oppMore").hidden = showAllOpps || rows.length <= 20;
+  $("oppMore").textContent = `Show all ${rows.length}`;
+  $("oppBody").innerHTML = rows.length ? shown.map(r => {
+    const dir = (r.net_a ?? -1) >= (r.net_b ?? -1) ? "Buy on Arc, sell on exchange" : "Buy on exchange, sell on Arc";
+    return `<tr><td>${when(r.ts)}</td><td>${esc(r.pair)}</td><td class="n">$${r.size.toLocaleString("en-GB")}</td><td>${dir}</td><td class="n">${sPct(r.net_best)}</td><td class="n">${money(r.net_best * r.size)}</td></tr>`;
+  }).join("") : `<tr><td colspan="6" class="empty">None in this period: no gap beat all the costs.</td></tr>`;
+  $("csvLink").href = `${API}/api/csv?days=${days}`;
+}
+
+async function loadChart() {
+  const j = await get(`/api/series?days=${days}&size=${size}`);
+  const svg = $("chart"), W = svg.clientWidth || 900, H = 300, L = 54, R = 70, T = 12, B = 28;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const byPair = {};
+  for (const r of j.rows || []) if (r.nb != null) (byPair[r.pair] ||= []).push([r.t, r.nb]);
+  const pts = Object.values(byPair).flat();
+  if (!pts.length) { svg.innerHTML = `<text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="#5A6B78" font-size="14">No data for this period yet</text>`; $("legend").innerHTML = ""; return; }
+  const t0 = Math.min(...pts.map(p => p[0])), t1 = Math.max(...pts.map(p => p[0])) || t0 + 1;
+  const clipped = new Set();
+  for (const [pair, ps] of Object.entries(byPair)) for (const p of ps) if (p[1] < FLOOR) { p[1] = FLOOR; clipped.add(pair); }
+  let y0 = Math.min(0, ...pts.map(p => p[1])), y1 = Math.max(0, ...pts.map(p => p[1]));
+  if (y1 - y0 < 0.002) { y1 += 0.001; y0 -= 0.001; }
+  const pad = (y1 - y0) * 0.08; y0 -= pad; y1 += pad;
+  const X = t => L + (W - L - R) * (t1 === t0 ? 0.5 : (t - t0) / (t1 - t0));
+  const Y = v => T + (H - T - B) * (1 - (v - y0) / (y1 - y0));
+  let g = "";
+  for (let i = 0; i <= 4; i++) {
+    const v = y0 + (y1 - y0) * i / 4;
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#E4E9EE"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="#5A6B78">${(v * 100).toFixed(2)}%</text>`;
+  }
+  g += `<line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="#15212C" stroke-width="1.2"/><text x="${W - R + 6}" y="${Y(0) + 4}" font-size="11" fill="#15212C">break-even</text>`;
+  for (const t of [t0, (t0 + t1) / 2, t1]) g += `<text x="${X(t)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#5A6B78">${new Date(t * 1000).toLocaleString("en-GB", days === 1 ? { timeStyle: "short" } : { day: "numeric", month: "short" })}</text>`;
+  for (const [pair, ps] of Object.entries(byPair)) {
+    const d = ps.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(" ");
+    const last = ps[ps.length - 1];
+    g += `<path d="${d}" fill="none" stroke="${COLORS[pair] || "#333"}" stroke-width="2"/>`;
+    if (!clipped.has(pair)) g += `<text x="${X(last[0]) + 6}" y="${Y(last[1]) - 6}" font-size="11" font-weight="600" fill="${COLORS[pair] || "#333"}">${esc(pair)}</text>`;
+  }
+  svg.innerHTML = g;
+  $("legend").innerHTML = Object.keys(byPair).map(p => `<span><i style="background:${COLORS[p] || "#333"}"></i>${esc(p)}${clipped.has(p) ? " (often below −3%, drawn at the bottom edge)" : ""}</span>`).join("");
+}
+
+function seg(id, cb) {
+  $(id).addEventListener("click", e => {
+    const b = e.target.closest("button"); if (!b) return;
+    for (const x of $(id).querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    cb(Number(b.dataset.v));
+  });
+}
+$("oppMore").addEventListener("click", () => { showAllOpps = true; loadOpps().catch(() => {}); });
+seg("sizeSeg", v => { size = v; loadChart().catch(() => {}); });
+seg("daysSeg", v => { days = v; refresh(false); });
+
+async function refresh(withLatest = true) {
+  try {
+    if (API.includes("REPLACE_WITH")) throw new Error("not configured");
+    const last = withLatest ? await loadLatest() : true;
+    await Promise.all([loadSummary(), loadOpps(), loadChart()]);
+    $("setupNotice").hidden = true;
+    const fresh = last && last !== true && Date.now() / 1000 - last < 300;
+    $("statusPill").textContent = last === null ? "Waiting for first check" : fresh ? "Live · checks every minute" : last === true ? $("statusPill").textContent : "Paused";
+    $("statusPill").className = "pill" + (fresh || last === true ? " live" : "");
+  } catch (e) {
+    $("setupNotice").hidden = false;
+    $("statusPill").textContent = "Not connected";
+    for (const id of ["latestBody", "sumBody", "oppBody"]) $(id).innerHTML = `<tr><td colspan="8" class="empty">Waiting for the monitor.</td></tr>`;
+  }
+}
+refresh();
+setInterval(refresh, 60000);
+addEventListener("resize", () => loadChart().catch(() => {}));
+</script>
+</body>
+</html>
