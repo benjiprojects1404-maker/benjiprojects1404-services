@@ -13,10 +13,12 @@ const USDC = "0x3600000000000000000000000000000000000000";    // USDC ERC-20 int
 const SIZES = [10, 1000];                                     // trade sizes in USD
 
 // cexFee is the assumed taker fee per trade (fraction). Shown on the dashboard as an assumption.
+// Binance blocks Cloudflare's servers, so Binance pairs fall back to Coinbase (cb), where USDC converts 1:1 to USD.
+const COINBASE_FEE = 0.006;
 export const PAIRS = [
-  { id: "cirBTC", token: "0x171a4217b86a807a64eb94757db6849fb4bdbaa0", dec: 8,  poolFee: 100, ref: "binance",  sym: "BTCUSDC",   cexFee: 0.001 },
+  { id: "cirBTC", token: "0x171a4217b86a807a64eb94757db6849fb4bdbaa0", dec: 8,  poolFee: 100, ref: "binance",  sym: "BTCUSDC",   cexFee: 0.001, cb: "BTC-USD" },
   { id: "EURC",   token: "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1", dec: 6,  poolFee: 500, ref: "coinbase", sym: "EURC-USDC", cexFee: 0.006 },
-  { id: "WETH",   token: "0x128cc466b61f542da60c70e3aa11c10e19b84edb", dec: 18, poolFee: 3000, ref: "binance", sym: "ETHUSDC",   cexFee: 0.001 },
+  { id: "WETH",   token: "0x128cc466b61f542da60c70e3aa11c10e19b84edb", dec: 18, poolFee: 3000, ref: "binance", sym: "ETHUSDC",   cexFee: 0.001, cb: "ETH-USD" },
 ];
 const QUOTE_SELECTOR = "0xc6a5026a"; // quoteExactInputSingle((address,address,uint256,uint24,uint160))
 const GAS_UNITS = 110000n;          // typical v3 single swap on Arc, from QuoterV2's gasEstimate
@@ -39,21 +41,23 @@ async function rpcBatch(calls) {
 }
 
 async function refPrice(p) {
-  if (p.ref === "coinbase") {
-    const r = await fetch(`https://api.exchange.coinbase.com/products/${p.sym}/ticker`, { headers: { "user-agent": "riptide-monitor" } });
+  const coinbase = async sym => {
+    const r = await fetch(`https://api.exchange.coinbase.com/products/${sym}/ticker`, { headers: { "user-agent": "riptide-monitor" } });
     if (!r.ok) throw new Error("coinbase " + r.status);
     const j = await r.json();
-    return { bid: Number(j.bid), ask: Number(j.ask), src: "coinbase" };
-  }
+    return { bid: Number(j.bid), ask: Number(j.ask), src: "coinbase", fee: COINBASE_FEE };
+  };
+  if (p.ref === "coinbase") return coinbase(p.sym);
   // Binance blocks some server regions; fall back to its public market-data mirror.
   for (const host of ["https://api.binance.com", "https://data-api.binance.vision"]) {
     try {
       const r = await fetch(`${host}/api/v3/ticker/bookTicker?symbol=${p.sym}`);
       if (!r.ok) continue;
       const j = await r.json();
-      if (j.bidPrice) return { bid: Number(j.bidPrice), ask: Number(j.askPrice), src: host.includes("vision") ? "binance-mirror" : "binance" };
+      if (j.bidPrice) return { bid: Number(j.bidPrice), ask: Number(j.askPrice), src: host.includes("vision") ? "binance-mirror" : "binance", fee: p.cexFee };
     } catch (_) { /* try next host */ }
   }
+  if (p.cb) return coinbase(p.cb);
   throw new Error("binance unavailable");
 }
 
@@ -89,7 +93,7 @@ export async function sample() {
     for (const usd of SIZES) {
       const row = { ts, pair: p.id, size: usd, ref_src: ref.src || null, cex_bid: ref.bid ?? null, cex_ask: ref.ask ?? null,
         arc_buy: null, arc_sell: null, gross_a: null, gross_b: null, net_a: null, net_b: null, net_best: null, would_trade: 0,
-        cex_fee: p.cexFee, gas_usd: gasUsd, error: ref.error || arcError || null };
+        cex_fee: ref.fee ?? p.cexFee, gas_usd: gasUsd, error: ref.error || arcError || null };
       if (!row.error) {
         const b = plan.find(x => x.i === i && x.usd === usd && x.dir === "buy");
         const s = plan.find(x => x.i === i && x.usd === usd && x.dir === "sell");
@@ -97,7 +101,7 @@ export async function sample() {
         const outUsd = res[s.idx] && res[s.idx].length >= 66 ? fromUnits(BigInt(res[s.idx].slice(0, 66)), 6) : 0;
         if (outTok > 0) row.arc_buy = usd / outTok;          // USDC per token paid on Arc (includes pool fee and slippage)
         if (outUsd > 0) row.arc_sell = outUsd / s.tokIn;     // USDC per token received on Arc
-        const costs = p.cexFee + gasUsd / usd;
+        const costs = (ref.fee ?? p.cexFee) + gasUsd / usd;
         if (row.arc_buy) { row.gross_a = ref.bid / row.arc_buy - 1; row.net_a = row.gross_a - costs; }   // buy Arc, sell exchange
         if (row.arc_sell) { row.gross_b = row.arc_sell / ref.ask - 1; row.net_b = row.gross_b - costs; } // buy exchange, sell Arc
         const nets = [row.net_a, row.net_b].filter(v => v !== null);
