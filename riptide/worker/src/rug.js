@@ -32,7 +32,7 @@ export function usdPerToken(sqrtPriceX96, token, dec) {
   return token.toLowerCase() < USDC ? raw * 10 ** (dec - 6) : 1 / (raw * 10 ** (6 - dec));
 }
 
-export async function ensureSchema(env) {
+export async function ensureSchema(env, COLS, BUCKET) {
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS pool_state (ts INTEGER NOT NULL, pair TEXT NOT NULL, pool TEXT NOT NULL, price REAL, liq REAL)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_pool_state ON pool_state (pool, pair, ts)`),
@@ -41,6 +41,36 @@ export async function ensureSchema(env) {
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts)`),
   ]);
   try { await env.DB.prepare(`ALTER TABLE samples ADD COLUMN alert TEXT`).run(); } catch (_) { /* already there */ }
+
+  // Read-saving tables (see store() in index.js). WITHOUT ROWID so each upsert is one row written.
+  await env.DB.batch([
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS rollup (bucket INTEGER NOT NULL, pair TEXT NOT NULL, size INTEGER NOT NULL,
+      n INTEGER NOT NULL, hits INTEGER NOT NULL, sum_best_gross REAL NOT NULL, max_net REAL, paper_pnl REAL NOT NULL,
+      first_ts INTEGER NOT NULL, last_ts INTEGER NOT NULL, sum_ga REAL NOT NULL, n_ga INTEGER NOT NULL,
+      sum_gb REAL NOT NULL, n_gb INTEGER NOT NULL, sum_nb REAL NOT NULL, n_nb INTEGER NOT NULL,
+      PRIMARY KEY (bucket, pair, size)) WITHOUT ROWID`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS opps (${COLS.join(",")})`),
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_opps_ts ON opps (ts)`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT) WITHOUT ROWID`),
+    // Nothing queries samples by (pair, size, ts) any more; dropping it saves a write per sample.
+    env.DB.prepare(`DROP INDEX IF EXISTS idx_samples_pair_size_ts`),
+  ]);
+
+  // One-off: fill rollup and opps from the history already saved. Runs once, in one transaction.
+  const done = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'backfill_v1'`).first();
+  if (!done) {
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO rollup (bucket, pair, size, n, hits, sum_best_gross, max_net, paper_pnl, first_ts, last_ts,
+          sum_ga, n_ga, sum_gb, n_gb, sum_nb, n_nb)
+        SELECT (ts / ${BUCKET}) * ${BUCKET}, pair, size, COUNT(*), SUM(would_trade),
+          SUM(MAX(COALESCE(gross_a, -1), COALESCE(gross_b, -1))), MAX(net_best),
+          SUM(CASE WHEN would_trade = 1 THEN COALESCE(net_best, 0) * size ELSE 0 END), MIN(ts), MAX(ts),
+          TOTAL(gross_a), COUNT(gross_a), TOTAL(gross_b), COUNT(gross_b), TOTAL(net_best), COUNT(net_best)
+        FROM samples WHERE error IS NULL GROUP BY 1, pair, size`),
+      env.DB.prepare(`INSERT INTO opps (${COLS.join(",")}) SELECT ${COLS.join(",")} FROM samples WHERE would_trade = 1`),
+      env.DB.prepare(`INSERT INTO meta (k, v) VALUES ('backfill_v1', ?)`).bind(String(Math.floor(Date.now() / 1000))),
+    ]);
+  }
 }
 
 // Reads every watched pool, compares with its previous reading, stores both, logs events.

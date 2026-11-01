@@ -20,4 +20,3 @@ CREATE TABLE IF NOT EXISTS samples (
   error       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_samples_ts ON samples (ts);
-CREATE INDEX IF NOT EXISTS idx_samples_pair_size_ts ON samples (pair, size, ts);
