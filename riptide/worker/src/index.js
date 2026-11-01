@@ -231,9 +231,44 @@ async function sampleVenues(ts, gasUsd, endpoints) {
 
 const COLS = ["ts", "pair", "size", "ref_src", "cex_bid", "cex_ask", "arc_buy", "arc_sell", "gross_a", "gross_b", "net_a", "net_b", "net_best", "would_trade", "cex_fee", "gas_usd", "error", "alert"];
 
+const BUCKET = 900; // 15-minute rollup buckets
+
+// Keeps D1 reads low: the dashboard reads small 15-minute rollups and a short table of hits
+// instead of scanning every saved minute (D1 counts every row a query scans).
+const ROLLUP_UPSERT = `INSERT INTO rollup (bucket, pair, size, n, hits, sum_best_gross, max_net, paper_pnl, first_ts, last_ts,
+    sum_ga, n_ga, sum_gb, n_gb, sum_nb, n_nb) VALUES (?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?)
+  ON CONFLICT (bucket, pair, size) DO UPDATE SET n = n + 1, hits = hits + excluded.hits,
+    sum_best_gross = sum_best_gross + excluded.sum_best_gross,
+    max_net = CASE WHEN excluded.max_net IS NULL THEN max_net WHEN max_net IS NULL OR excluded.max_net > max_net THEN excluded.max_net ELSE max_net END,
+    paper_pnl = paper_pnl + excluded.paper_pnl, first_ts = MIN(first_ts, excluded.first_ts), last_ts = MAX(last_ts, excluded.last_ts),
+    sum_ga = sum_ga + excluded.sum_ga, n_ga = n_ga + excluded.n_ga, sum_gb = sum_gb + excluded.sum_gb, n_gb = n_gb + excluded.n_gb,
+    sum_nb = sum_nb + excluded.sum_nb, n_nb = n_nb + excluded.n_nb`;
+
 async function store(env, rows) {
   const stmt = env.DB.prepare(`INSERT INTO samples (${COLS.join(",")}) VALUES (${COLS.map(() => "?").join(",")})`);
-  await env.DB.batch(rows.map(r => stmt.bind(...COLS.map(c => r[c]))));
+  const opp = env.DB.prepare(`INSERT INTO opps (${COLS.join(",")}) VALUES (${COLS.map(() => "?").join(",")})`);
+  const roll = env.DB.prepare(ROLLUP_UPSERT);
+  const v = x => (x === null || x === undefined ? 0 : x), has = x => (x === null || x === undefined ? 0 : 1);
+  const stmts = rows.map(r => stmt.bind(...COLS.map(c => r[c])));
+  for (const r of rows) {
+    if (r.would_trade) stmts.push(opp.bind(...COLS.map(c => r[c])));
+    if (r.error) continue; // the dashboard's summary and chart only count clean samples
+    stmts.push(roll.bind(Math.floor(r.ts / BUCKET) * BUCKET, r.pair, r.size, r.would_trade ? 1 : 0,
+      Math.max(r.gross_a ?? -1, r.gross_b ?? -1), r.net_best ?? null, r.would_trade ? v(r.net_best) * r.size : 0, r.ts, r.ts,
+      v(r.gross_a), has(r.gross_a), v(r.gross_b), has(r.gross_b), v(r.net_best), has(r.net_best)));
+  }
+  await env.DB.batch(stmts);
+}
+
+// Small per-isolate cache so several open dashboards share one set of reads.
+const memo = new Map();
+async function cached(key, ttlSec, fn) {
+  const hit = memo.get(key);
+  if (hit && hit.until > Date.now()) return hit.value;
+  const value = await fn();
+  memo.set(key, { value, until: Date.now() + ttlSec * 1000 });
+  if (memo.size > 200) memo.delete(memo.keys().next().value);
+  return value;
 }
 
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET", "cache-control": "public, max-age=30" };
@@ -249,24 +284,30 @@ async function api(url, env) {
     return json({ rows: r.results, pairs: PAIRS.map(({ id, ref, sym, cexFee, poolFee }) => ({ id, ref, sym, cexFee, poolFee })),
       rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
   }
+  const fromBucket = Math.floor(since / BUCKET) * BUCKET;
   if (p === "/api/summary") {
-    const r = await env.DB.prepare(`SELECT pair, size, COUNT(*) n, SUM(would_trade) hits, MAX(net_best) best_net,
-        AVG(MAX(COALESCE(gross_a, -1), COALESCE(gross_b, -1))) avg_best_gross, MIN(ts) first_ts, MAX(ts) last_ts,
-        SUM(CASE WHEN would_trade=1 THEN net_best*size ELSE 0 END) paper_pnl
-      FROM samples WHERE ts >= ? AND error IS NULL GROUP BY pair, size ORDER BY pair, size`).bind(since).all();
-    const start = await env.DB.prepare(`SELECT MIN(ts) t FROM samples`).first();
-    return json({ days, since, started: start ? start.t : null, rows: r.results });
+    return json(await cached(`summary:${days}`, 300, async () => {
+      const r = await env.DB.prepare(`SELECT pair, size, SUM(n) n, SUM(hits) hits, MAX(max_net) best_net,
+          SUM(sum_best_gross) / SUM(n) avg_best_gross, MIN(first_ts) first_ts, MAX(last_ts) last_ts, SUM(paper_pnl) paper_pnl
+        FROM rollup WHERE bucket >= ? GROUP BY pair, size ORDER BY pair, size`).bind(fromBucket).all();
+      const start = await env.DB.prepare(`SELECT MIN(ts) t FROM samples`).first();
+      return { days, since, started: start ? start.t : null, rows: r.results };
+    }));
   }
   if (p === "/api/series") {
     // One point per 15 minutes (average) so a week is ~670 points per line.
     const size = Number(url.searchParams.get("size")) || 1000;
-    const r = await env.DB.prepare(`SELECT pair, (ts/900)*900 t, AVG(gross_a) ga, AVG(gross_b) gb, AVG(net_best) nb
-      FROM samples WHERE ts >= ? AND size = ? AND error IS NULL GROUP BY pair, t ORDER BY t`).bind(since, size).all();
-    return json({ size, rows: r.results });
+    return json(await cached(`series:${days}:${size}`, 300, async () => {
+      const r = await env.DB.prepare(`SELECT pair, bucket t, sum_ga / n_ga ga, sum_gb / n_gb gb, sum_nb / n_nb nb
+        FROM rollup WHERE bucket >= ? AND size = ? ORDER BY bucket`).bind(fromBucket, size).all();
+      return { size, rows: r.results };
+    }));
   }
   if (p === "/api/opps") {
-    const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts >= ? AND would_trade = 1 ORDER BY ts DESC LIMIT 200`).bind(since).all();
-    return json({ rows: r.results });
+    return json(await cached(`opps:${days}`, 120, async () => {
+      const r = await env.DB.prepare(`SELECT * FROM opps WHERE ts >= ? ORDER BY ts DESC LIMIT 200`).bind(since).all();
+      return { rows: r.results };
+    }));
   }
   if (p === "/api/events") {
     let r = { results: [] };
@@ -286,7 +327,7 @@ let schemaReady = false;
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil((async () => {
-      if (!schemaReady) { await ensureSchema(env); schemaReady = true; }
+      if (!schemaReady) { await ensureSchema(env, COLS, BUCKET); schemaReady = true; }
       const rows = await sample(env);
       const ts = rows[0] ? rows[0].ts : Math.floor(Date.now() / 1000);
       // Rug alarm: read every watched pool, log sudden price drops / liquidity pulls, pause those pairs.
@@ -300,7 +341,8 @@ export default {
         + (events.length ? `; ALARM: ${events.map(e => `${e.w.pair} ${e.w.pool} ${e.kind} ${(e.change * 100).toFixed(0)}%`).join(", ")}` : ""));
       // Keep 30 days.
       const cutoff = Math.floor(Date.now() / 1000) - 30 * 86400;
-      await env.DB.batch(["samples", "pool_state", "events"].map(t => env.DB.prepare(`DELETE FROM ${t} WHERE ts < ?`).bind(cutoff)));
+      await env.DB.batch(["samples", "pool_state", "events", "opps"].map(t => env.DB.prepare(`DELETE FROM ${t} WHERE ts < ?`).bind(cutoff))
+        .concat(env.DB.prepare(`DELETE FROM rollup WHERE bucket < ?`).bind(cutoff)));
     })());
   },
   async fetch(req, env) {

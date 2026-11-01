@@ -285,11 +285,12 @@ $("oppMore").addEventListener("click", () => { showAllOpps = true; loadOpps().ca
 seg("sizeSeg", v => { size = v; loadChart().catch(() => {}); });
 seg("daysSeg", v => { days = v; refresh(false); });
 
-async function refresh(withLatest = true) {
+async function refresh(withLatest = true, heavy = true) {
   try {
     if (API.includes("REPLACE_WITH")) throw new Error("not configured");
     const last = withLatest ? await loadLatest() : true;
-    await Promise.all([loadSummary(), loadOpps(), loadChart(), loadEvents().catch(() => {})]);
+    // Latest prices and rug alarms every minute; summary, chart and hits every 15 minutes (they change slowly).
+    await Promise.all(heavy ? [loadSummary(), loadOpps(), loadChart(), loadEvents().catch(() => {})] : [loadEvents().catch(() => {})]);
     $("setupNotice").hidden = true;
     const fresh = last && last !== true && Date.now() / 1000 - last < 300;
     $("statusPill").textContent = last === null ? "Waiting for first check" : fresh ? "Live · checks every minute" : last === true ? $("statusPill").textContent : "Paused";
@@ -301,7 +302,8 @@ async function refresh(withLatest = true) {
   }
 }
 refresh();
-setInterval(refresh, 60000);
+let tick = 0;
+setInterval(() => refresh(true, ++tick % 15 === 0), 60000);
 addEventListener("resize", () => loadChart().catch(() => {}));
 </script>
 </body>
