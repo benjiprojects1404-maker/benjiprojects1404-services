@@ -37,6 +37,9 @@ const GAS_UNITS = 110000n;          // typical v3 single swap on Arc, from Quote
 // FAZE (added 2 Nov 2026): home is Faze's own graduated pool (native USDC against FAZE, through Faze's launchpad hook,
 // which takes a 2.5% fee); the other is the deepest plain v4 FAZE/USDC pool (5% fee). Native USDC and the USDC ERC-20
 // are the same balance on Arc, so the two pools can be compared directly.
+// FAZE is WATCH-ONLY (2 Nov 2026): the plain v4 pool is too shallow for a meaningful reference price (at $1,000 its
+// bid/ask spread is enormous), so FAZE rows are logged and shown but never count as "would trade", never enter the
+// hits table or the paper result, and its pools never raise rug alarms.
 const QUOTER_V4 = "0x8dc178efb8111bb0973dd9d722ebeff267c98f94"; // Uniswap V4Quoter on Arc
 const V4_SELECTOR = "0xaa9d21cb"; // quoteExactInputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))
 const NATIVE = "0x0000000000000000000000000000000000000000";   // Arc's native USDC, 18 decimals
@@ -47,10 +50,12 @@ export const VENUE_PAIRS = [
     home: { kind: "v3", fee: 10000, label: "v3 1%" },
     others: [ { kind: "v4", quote: USDC, qdec: 6, fee: 9850, tickSpacing: 99, hooks: ZERO_HOOK, label: "v4 0.985%" },
               { kind: "v4", quote: USDC, qdec: 6, fee: 40000, tickSpacing: 200, hooks: ZERO_HOOK, label: "v4 4%" } ] },
-  { id: "FAZE", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18,
+  { id: "FAZE", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18, watchOnly: true,
     home: { kind: "v4", quote: NATIVE, qdec: 18, fee: 0, tickSpacing: 200, hooks: FAZE_HOOK, label: "Faze pool" },
     others: [ { kind: "v4", quote: USDC, qdec: 6, fee: 50000, tickSpacing: 100, hooks: ZERO_HOOK, label: "v4 5%" } ] },
 ];
+
+export const WATCH_ONLY = new Set(VENUE_PAIRS.filter(p => p.watchOnly).map(p => p.id));
 
 const word = v => BigInt(v).toString(16).padStart(64, "0");
 const addrWord = a => a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
@@ -304,7 +309,7 @@ async function api(url, env) {
 
   if (p === "/api/latest") {
     const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts = (SELECT MAX(ts) FROM samples) ORDER BY pair, size`).all();
-    return json({ rows: r.results, pairs: PAIRS.map(({ id, ref, sym, cexFee, poolFee }) => ({ id, ref, sym, cexFee, poolFee })),
+    return json({ rows: r.results, pairs: PAIRS.map(({ id, ref, sym, cexFee, poolFee }) => ({ id, ref, sym, cexFee, poolFee })), watchOnly: [...WATCH_ONLY],
       rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
   }
   const fromBucket = Math.floor(since / BUCKET) * BUCKET;
@@ -382,6 +387,8 @@ export default {
       const events = await checkPools(env, ts, rpcBatch, endpoints, extra).catch(e => { console.log("rug check failed: " + (e.message || e)); return []; });
       const paused = await pausedPairs(env, ts);
       for (const r of rows) { const p = paused.get(r.pair); if (p) { r.alert = "paused: " + p.kind; r.would_trade = 0; } else r.alert = null; }
+      // Watch-only pairs are logged but can never count as a trade (no hits, no paper result).
+      for (const r of rows) if (WATCH_ONLY.has(r.pair)) { r.would_trade = 0; r.alert = r.alert || "watch only"; }
       await store(env, rows);
       const errs = [...new Set(rows.map(r => r.error).filter(Boolean))];
       console.log(`riptide: saved ${rows.length} rows` + (errs.length ? `; issues: ${errs.join(" | ")}` : "; all sources ok")

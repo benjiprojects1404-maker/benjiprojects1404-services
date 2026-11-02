@@ -23,8 +23,9 @@ export const WATCH = [
   { pair: "ARGUS",  pool: "v4 4%",    kind: "v4", id: "0xebde8959fac1a0a1f837189e7f00f40566f4c1fc6efa3b3c987222222fd31455", token: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18 },
   // Faze (faze.fun) coins. Their main pools are the graduated Faze pools: native USDC (18 decimals) against the coin,
   // through Faze's launchpad hook, which takes the trading fee. Pool ids checked on Arc mainnet, 2 Nov 2026.
-  { pair: "FAZE",   pool: "Faze pool", kind: "v4", id: "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18, quote: NATIVE, qdec: 18 },
-  { pair: "FAZE",   pool: "v4 5%",     kind: "v4", id: "0xcb4925117715e6983ee6e03d491d90bbc498776b761714c447a9ea80265ca846", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18 },
+  // FAZE is watch-only: its pools are read for the Faze watch prices but marked noAlarm, so they never raise alarms.
+  { pair: "FAZE",   pool: "Faze pool", kind: "v4", id: "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18, quote: NATIVE, qdec: 18, noAlarm: true },
+  { pair: "FAZE",   pool: "v4 5%",     kind: "v4", id: "0xcb4925117715e6983ee6e03d491d90bbc498776b761714c447a9ea80265ca846", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18, noAlarm: true },
   { pair: "AF",     pool: "Faze pool", kind: "v4", id: "0x1c0523377296238f6a2fd25cb3b15f75e280eb330ad29f843b974eec264dfe31", token: "0x75d658f8101fbe6dc217fbba7e20a0312af5fa2e", dec: 18, quote: NATIVE, qdec: 18 },
 ];
 
@@ -116,7 +117,7 @@ export async function checkPools(env, ts, rpcBatch, endpoints, extra = []) {
     }
     states.push({ w, price, liq });
     const prev = await env.DB.prepare(`SELECT price, liq FROM pool_state WHERE pool = ? AND pair = ? ORDER BY ts DESC LIMIT 1`).bind(w.pool, w.pair).first();
-    if (prev) {
+    if (prev && !w.noAlarm) {
       if (prev.liq > 0 && liq <= 0) events.push({ w, kind: "pool_empty", change: -1, before: prev.liq, after: liq });
       else if (prev.liq > 0 && liq / prev.liq - 1 <= -LIQ_DROP) events.push({ w, kind: "liquidity_drop", change: liq / prev.liq - 1, before: prev.liq, after: liq });
       if (prev.price > 0 && price && price / prev.price - 1 <= -PRICE_DROP) events.push({ w, kind: "price_drop", change: price / prev.price - 1, before: prev.price, after: price });
