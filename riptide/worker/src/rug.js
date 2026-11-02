@@ -10,6 +10,7 @@ export const LIQ_DROP = 0.50;
 export const PAUSE_MIN = 60;
 
 const USDC = "0x3600000000000000000000000000000000000000";
+const NATIVE = "0x0000000000000000000000000000000000000000";
 const STATE_VIEW = "0xf3334192d15450cdd385c8b70e03f9a6bd9e673b"; // Uniswap v4 StateView on Arc
 
 // Every pool Riptide quotes. v3 pools by address; v4 pools by pool id.
@@ -20,16 +21,22 @@ export const WATCH = [
   { pair: "ARGUS",  pool: "v3 1%",    kind: "v3", address: "0x6a3bacaa6493734c1ac221ebf42cf530a96c1e02", token: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18 },
   { pair: "ARGUS",  pool: "v4 0.985%", kind: "v4", id: "0xb3f441e8871840ecfcb284e5cbb5b9c21a50e961e1c50109bdced25e429f00cc", token: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18 },
   { pair: "ARGUS",  pool: "v4 4%",    kind: "v4", id: "0xebde8959fac1a0a1f837189e7f00f40566f4c1fc6efa3b3c987222222fd31455", token: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18 },
+  // Faze (faze.fun) coins. Their main pools are the graduated Faze pools: native USDC (18 decimals) against the coin,
+  // through Faze's launchpad hook, which takes the trading fee. Pool ids checked on Arc mainnet, 2 Nov 2026.
+  { pair: "FAZE",   pool: "Faze pool", kind: "v4", id: "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18, quote: NATIVE, qdec: 18 },
+  { pair: "FAZE",   pool: "v4 5%",     kind: "v4", id: "0xcb4925117715e6983ee6e03d491d90bbc498776b761714c447a9ea80265ca846", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18 },
+  { pair: "AF",     pool: "Faze pool", kind: "v4", id: "0x1c0523377296238f6a2fd25cb3b15f75e280eb330ad29f843b974eec264dfe31", token: "0x75d658f8101fbe6dc217fbba7e20a0312af5fa2e", dec: 18, quote: NATIVE, qdec: 18 },
 ];
 
 const addrWord = a => a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 const first = r => (r && r.length >= 66 ? BigInt(r.slice(0, 66)) : null);
 
-// USD per token from a Uniswap sqrtPriceX96 (token1 per token0, in base units).
-export function usdPerToken(sqrtPriceX96, token, dec) {
+// Price of the token in its quote currency (USD for USDC or native USDC) from a Uniswap sqrtPriceX96
+// (token1 per token0, in base units). quote defaults to the USDC ERC-20 (6 decimals).
+export function usdPerToken(sqrtPriceX96, token, dec, quote = USDC, qdec = 6) {
   const raw = (Number(sqrtPriceX96) / 2 ** 96) ** 2;
   if (!raw) return null;
-  return token.toLowerCase() < USDC ? raw * 10 ** (dec - 6) : 1 / (raw * 10 ** (6 - dec));
+  return token.toLowerCase() < quote.toLowerCase() ? raw * 10 ** (dec - qdec) : 10 ** (dec - qdec) / raw;
 }
 
 export async function ensureSchema(env, COLS, BUCKET) {
@@ -74,9 +81,12 @@ export async function ensureSchema(env, COLS, BUCKET) {
 }
 
 // Reads every watched pool, compares with its previous reading, stores both, logs events.
-export async function checkPools(env, ts, rpcBatch, endpoints) {
+// extra: pools added at run time (Faze coins that graduated in the last week, from faze.js).
+export async function checkPools(env, ts, rpcBatch, endpoints, extra = []) {
+  const ids = new Set(WATCH.map(w => w.id).filter(Boolean));
+  const all = WATCH.concat(extra.filter(w => w.id && !ids.has(w.id)));
   const calls = [], plan = [];
-  for (const w of WATCH) {
+  for (const w of all) {
     const c = n => { plan.push({ w, n, idx: calls.length }); };
     if (w.kind === "v3") {
       c("slot0"); calls.push({ method: "eth_call", params: [{ to: w.address, data: "0x3850c7bd" }, "latest"] });
@@ -91,10 +101,10 @@ export async function checkPools(env, ts, rpcBatch, endpoints) {
   const get = (w, n) => first(out[plan.find(x => x.w === w && x.n === n).idx]);
 
   const events = [], states = [];
-  for (const w of WATCH) {
+  for (const w of all) {
     const sp = get(w, "slot0");
     if (sp === null) continue; // couldn't read this minute; don't guess
-    const price = usdPerToken(sp, w.token, w.dec);
+    const price = usdPerToken(sp, w.token, w.dec, w.quote, w.qdec);
     let liq;
     if (w.kind === "v3") {
       const tok = get(w, "tok"), usdc = get(w, "usdc");

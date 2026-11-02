@@ -2,6 +2,9 @@
 
 Read-only monitor: every minute it quotes Arc's Uniswap v3 pools (cirBTC, EURC, WETH against USDC, at $10 and $1,000),
 compares them with Binance / Coinbase, and logs the gap after fees to a Cloudflare D1 database.
+ARGUS and FAZE (no exchange listing) are compared Arc pool against Arc pool instead.
+It also follows Faze (faze.fun), Arc's memecoin launchpad: launches, graduations into locked Uniswap v4 pools,
+and a week of rug-alarm checks on each newly graduated pool (`src/faze.js`).
 It never trades and needs no wallet, keys or exchange accounts.
 
 Free tier is enough: about 8,600 rows a day, 30 days kept.
@@ -45,6 +48,8 @@ No redeploy needed. The public RPC stays as the fallback. Never commit that URL:
 - `/api/summary?days=7` totals per pair and size
 - `/api/series?days=7&size=1000` 15-minute averages for the chart
 - `/api/opps?days=7` checks where the gap beat all costs
+- `/api/events?days=7` rug-alarm events
+- `/api/faze?days=7` Faze coins watched (price, 24 h change) plus launches and graduations
 - `/api/csv?days=7` everything, as CSV
 
 ## Assumptions (edit in `src/index.js`)

@@ -5,11 +5,14 @@
 //   1. asks Arc's Uniswap v3 QuoterV2 what a $10 and a $1,000 trade would return, both directions;
 //   2. reads the live bid/ask on the reference exchange (Binance or Coinbase);
 //   3. works out the gap both ways, minus the exchange fee and Arc gas, and stores it in D1.
-// For volatile Arc-native tokens with no exchange listing (ARGUS) it instead compares two Arc venues,
-// Uniswap v3 against Uniswap v4, by chaining real quotes: buy in one pool, sell the same tokens in the other.
+// For volatile Arc-native tokens with no exchange listing (ARGUS, FAZE) it instead compares two Arc pools
+// by chaining real quotes: buy in one pool, sell the same tokens in the other.
+// It also follows Faze (faze.fun), Arc's memecoin launchpad: new launches, graduations into locked Uniswap v4 pools,
+// and a week of rug-alarm checks on each newly graduated pool (see faze.js).
 // The same Worker serves a small JSON API for the dashboard.
 
-import { ensureSchema, checkPools, pausedPairs, PAUSE_MIN, PRICE_DROP, LIQ_DROP } from "./rug.js";
+import { ensureSchema, checkPools, pausedPairs, WATCH, PAUSE_MIN, PRICE_DROP, LIQ_DROP } from "./rug.js";
+import { ensureFazeSchema, scanFaze, graduatedWatch, WATCH_DAYS } from "./faze.js";
 
 const ARC_RPC = "https://rpc.mainnet.arc.io";
 const QUOTER = "0x7dfd4f31be6814d2906bde155c3e1b146eac1468"; // Uniswap QuoterV2 on Arc (chain 5042)
@@ -27,22 +30,36 @@ export const PAIRS = [
 const QUOTE_SELECTOR = "0xc6a5026a"; // quoteExactInputSingle((address,address,uint256,uint24,uint160))
 const GAS_UNITS = 110000n;          // typical v3 single swap on Arc, from QuoterV2's gasEstimate
 
-// Arc-vs-Arc pairs: the same token in a Uniswap v3 pool and in Uniswap v4 pools (chosen 31 Oct 2026 as the
-// v4 ARGUS/USDC pools with real liquidity and sane fees; the other ~170 are empty or charge 20-50%).
+// Arc-vs-Arc pairs: the same token in two Arc pools. Riptide buys in the "home" pool and sells the same tokens
+// in each other pool (and the reverse), using chained real quotes.
+// ARGUS (chosen 31 Oct 2026): home is the Uniswap v3 1% pool; the others are the v4 ARGUS/USDC pools with real
+// liquidity and sane fees (the other ~170 are empty or charge 20-50%).
+// FAZE (added 2 Nov 2026): home is Faze's own graduated pool (native USDC against FAZE, through Faze's launchpad hook,
+// which takes a 2.5% fee); the other is the deepest plain v4 FAZE/USDC pool (5% fee). Native USDC and the USDC ERC-20
+// are the same balance on Arc, so the two pools can be compared directly.
 const QUOTER_V4 = "0x8dc178efb8111bb0973dd9d722ebeff267c98f94"; // Uniswap V4Quoter on Arc
 const V4_SELECTOR = "0xaa9d21cb"; // quoteExactInputSingle(((address,address,uint24,int24,address),bool,uint128,bytes))
+const NATIVE = "0x0000000000000000000000000000000000000000";   // Arc's native USDC, 18 decimals
+const ZERO_HOOK = "0x0000000000000000000000000000000000000000";
+const FAZE_HOOK = "0x47e7936ae9891e61c5123db720593c05de7120cc";  // Faze LaunchpadHook
 export const VENUE_PAIRS = [
-  { id: "ARGUS", token: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18, v3Fee: 10000,
-    v4: [ { fee: 9850, tickSpacing: 99, hooks: "0x0000000000000000000000000000000000000000", label: "v4 0.985%" },
-          { fee: 40000, tickSpacing: 200, hooks: "0x0000000000000000000000000000000000000000", label: "v4 4%" } ] },
+  { id: "ARGUS", token: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18,
+    home: { kind: "v3", fee: 10000, label: "v3 1%" },
+    others: [ { kind: "v4", quote: USDC, qdec: 6, fee: 9850, tickSpacing: 99, hooks: ZERO_HOOK, label: "v4 0.985%" },
+              { kind: "v4", quote: USDC, qdec: 6, fee: 40000, tickSpacing: 200, hooks: ZERO_HOOK, label: "v4 4%" } ] },
+  { id: "FAZE", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18,
+    home: { kind: "v4", quote: NATIVE, qdec: 18, fee: 0, tickSpacing: 200, hooks: FAZE_HOOK, label: "Faze pool" },
+    others: [ { kind: "v4", quote: USDC, qdec: 6, fee: 50000, tickSpacing: 100, hooks: ZERO_HOOK, label: "v4 5%" } ] },
 ];
 
 const word = v => BigInt(v).toString(16).padStart(64, "0");
 const addrWord = a => a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 
-// v4 pool key: currency0 is the lower address. Here USDC (0x36..) < token, so buying the token is zeroForOne.
-function quoteV4Call(token, pool, zeroForOne, amountIn) {
-  const [c0, c1] = USDC.toLowerCase() < token.toLowerCase() ? [USDC, token] : [token, USDC];
+// v4 pool key: currency0 is the lower address. buy = quote currency in, token out.
+function quoteV4Call(token, pool, buy, amountIn) {
+  const quoteIsC0 = pool.quote.toLowerCase() < token.toLowerCase();
+  const [c0, c1] = quoteIsC0 ? [pool.quote, token] : [token, pool.quote];
+  const zeroForOne = buy ? quoteIsC0 : !quoteIsC0;
   return V4_SELECTOR + word(32) + addrWord(c0) + addrWord(c1) + word(pool.fee) + word(pool.tickSpacing) + addrWord(pool.hooks)
     + word(zeroForOne ? 1 : 0) + word(amountIn) + word(256) + word(0);
 }
@@ -56,7 +73,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // Sends the calls as one JSON-RPC batch. Calls that fail (often "rate limit" on shared Cloudflare IPs) are
 // retried a few times, then on the next endpoint. Returns results by index plus the last error seen.
-async function rpcBatch(calls, endpoints) {
+export async function rpcBatch(calls, endpoints) {
   const out = new Array(calls.length).fill(null);
   let todo = calls.map((_, i) => i), lastErr = null;
   for (const url of endpoints) {
@@ -171,30 +188,36 @@ export async function sample(env = {}) {
   return rows;
 }
 
+// One quote in one venue: buy = USD in, token out; sell = token in, USD out. Returns the call, and the
+// decimals of the USD side so results can be read in dollars.
+function venueCall(p, v, buy, amountIn) {
+  if (v.kind === "v3") return { to: QUOTER, data: buy ? quoteCall(USDC, p.token, amountIn, v.fee) : quoteCall(p.token, USDC, amountIn, v.fee), qdec: 6 };
+  return { to: QUOTER_V4, data: quoteV4Call(p.token, v, buy, amountIn), qdec: v.qdec };
+}
+const qdecOf = v => (v.kind === "v3" ? 6 : v.qdec);
+
 // Buy on one Arc venue, sell the same tokens on the other: two rounds of quotes (the second leg needs the
 // first leg's output). Both legs settle on Arc, so there is no exchange fee and no transfer; only two swaps' gas.
 async function sampleVenues(ts, gasUsd, endpoints) {
   const rows = [];
   for (const p of VENUE_PAIRS) {
-    const usdcIsC0 = USDC.toLowerCase() < p.token.toLowerCase();
+    const call = c => ({ method: "eth_call", params: [{ to: c.to, data: c.data }, "latest"] });
     const r1 = [], plan1 = [];
     for (const usd of SIZES) {
-      plan1.push({ usd, leg: "v3buy", idx: r1.length });
-      r1.push({ method: "eth_call", params: [{ to: QUOTER, data: quoteCall(USDC, p.token, units(usd, 6), p.v3Fee) }, "latest"] });
-      p.v4.forEach((pool, k) => { plan1.push({ usd, leg: "v4buy", k, idx: r1.length });
-        r1.push({ method: "eth_call", params: [{ to: QUOTER_V4, data: quoteV4Call(p.token, pool, usdcIsC0, units(usd, 6)) }, "latest"] }); });
+      plan1.push({ usd, leg: "homebuy", idx: r1.length });
+      r1.push(call(venueCall(p, p.home, true, units(usd, qdecOf(p.home)))));
+      p.others.forEach((v, k) => { plan1.push({ usd, leg: "otherbuy", k, idx: r1.length });
+        r1.push(call(venueCall(p, v, true, units(usd, qdecOf(v))))); });
     }
     const a = await rpcBatch(r1, endpoints);
     const got = (usd, leg, k) => firstWord(a.out[plan1.find(x => x.usd === usd && x.leg === leg && x.k === k).idx]);
     const r2 = [], plan2 = [];
     for (const usd of SIZES) {
-      const v3tok = got(usd, "v3buy", undefined);
-      p.v4.forEach((pool, k) => {
-        const v4tok = got(usd, "v4buy", k);
-        if (v3tok > 0n) { plan2.push({ usd, k, leg: "sellV4", tokIn: v3tok, idx: r2.length });
-          r2.push({ method: "eth_call", params: [{ to: QUOTER_V4, data: quoteV4Call(p.token, pool, !usdcIsC0, v3tok) }, "latest"] }); }
-        if (v4tok > 0n) { plan2.push({ usd, k, leg: "sellV3", tokIn: v4tok, idx: r2.length });
-          r2.push({ method: "eth_call", params: [{ to: QUOTER, data: quoteCall(p.token, USDC, v4tok, p.v3Fee) }, "latest"] }); }
+      const homeTok = got(usd, "homebuy", undefined);
+      p.others.forEach((v, k) => {
+        const otherTok = got(usd, "otherbuy", k);
+        if (homeTok > 0n) { plan2.push({ usd, k, leg: "sellOther", idx: r2.length }); r2.push(call(venueCall(p, v, false, homeTok))); }
+        if (otherTok > 0n) { plan2.push({ usd, k, leg: "sellHome", idx: r2.length }); r2.push(call(venueCall(p, p.home, false, otherTok))); }
       });
     }
     const b = r2.length ? await rpcBatch(r2, endpoints) : { out: [], lastErr: null };
@@ -202,17 +225,17 @@ async function sampleVenues(ts, gasUsd, endpoints) {
     for (const usd of SIZES) {
       const costs = 2 * gasUsd / usd; // two swaps on Arc; pool fees and slippage are already inside the quotes
       let best = null;
-      p.v4.forEach((pool, k) => {
-        const v3tok = got(usd, "v3buy", undefined), v4tok = got(usd, "v4buy", k);
-        const sA = plan2.find(x => x.usd === usd && x.k === k && x.leg === "sellV4");
-        const sB = plan2.find(x => x.usd === usd && x.k === k && x.leg === "sellV3");
-        const outA = sA ? fromUnits(firstWord(b.out[sA.idx]), 6) : 0; // buy v3, sell v4
-        const outB = sB ? fromUnits(firstWord(b.out[sB.idx]), 6) : 0; // buy v4, sell v3
-        const row = { ts, pair: p.id, size: usd, ref_src: "arc " + pool.label,
-          arc_buy: v3tok > 0n ? usd / fromUnits(v3tok, p.dec) : null,
-          arc_sell: outB && v4tok > 0n ? outB / fromUnits(v4tok, p.dec) : null,
-          cex_ask: v4tok > 0n ? usd / fromUnits(v4tok, p.dec) : null,
-          cex_bid: outA && v3tok > 0n ? outA / fromUnits(v3tok, p.dec) : null,
+      p.others.forEach((v, k) => {
+        const homeTok = got(usd, "homebuy", undefined), otherTok = got(usd, "otherbuy", k);
+        const sA = plan2.find(x => x.usd === usd && x.k === k && x.leg === "sellOther");
+        const sB = plan2.find(x => x.usd === usd && x.k === k && x.leg === "sellHome");
+        const outA = sA ? fromUnits(firstWord(b.out[sA.idx]), qdecOf(v)) : 0;      // buy home, sell other
+        const outB = sB ? fromUnits(firstWord(b.out[sB.idx]), qdecOf(p.home)) : 0; // buy other, sell home
+        const row = { ts, pair: p.id, size: usd, ref_src: "arc " + v.label,
+          arc_buy: homeTok > 0n ? usd / fromUnits(homeTok, p.dec) : null,
+          arc_sell: outB && otherTok > 0n ? outB / fromUnits(otherTok, p.dec) : null,
+          cex_ask: otherTok > 0n ? usd / fromUnits(otherTok, p.dec) : null,
+          cex_bid: outA && homeTok > 0n ? outA / fromUnits(homeTok, p.dec) : null,
           gross_a: outA ? outA / usd - 1 : null, gross_b: outB ? outB / usd - 1 : null,
           net_a: null, net_b: null, net_best: null, would_trade: 0, cex_fee: 0, gas_usd: 2 * gasUsd, error: null };
         if (row.gross_a !== null) row.net_a = row.gross_a - costs;
@@ -314,12 +337,33 @@ async function api(url, env) {
     try { r = await env.DB.prepare(`SELECT * FROM events WHERE ts >= ? ORDER BY ts DESC LIMIT 200`).bind(since).all(); } catch (_) { /* table not created yet */ }
     return json({ rows: r.results, rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
   }
+  if (p === "/api/faze") {
+    // Faze coins Riptide reads every minute (latest price and liquidity, and price 24 h ago), plus launches and graduations.
+    return json(await cached(`faze:${days}`, 60, async () => {
+      const now = Math.floor(Date.now() / 1000);
+      const pools = WATCH.filter(w => w.pool === "Faze pool").concat(await graduatedWatch(env, now));
+      const watched = [];
+      for (const w of pools) {
+        const last = await env.DB.prepare(`SELECT ts, price, liq FROM pool_state WHERE pool = ? AND pair = ? ORDER BY ts DESC LIMIT 1`).bind(w.pool, w.pair).first();
+        const dayAgo = await env.DB.prepare(`SELECT price, liq FROM pool_state WHERE pool = ? AND pair = ? AND ts >= ? ORDER BY ts LIMIT 1`).bind(w.pool, w.pair, now - 86400).first();
+        watched.push({ pair: w.pair, pool: w.pool, token: w.token, quote: w.quote === "0x0000000000000000000000000000000000000000" ? "USDC" : "FAZE",
+          ts: last ? last.ts : null, price: last ? last.price : null, price24h: dayAgo ? dayAgo.price : null,
+          liqChange24h: last && dayAgo && dayAgo.liq > 0 ? last.liq / dayAgo.liq - 1 : null });
+      }
+      let ev = { results: [] }, scanned = null;
+      try {
+        ev = await env.DB.prepare(`SELECT ts, kind, token, name, symbol, quote, pool_id, quote_seeded, tx FROM faze_events WHERE ts >= ? ORDER BY ts DESC LIMIT 100`).bind(since).all();
+        scanned = await env.DB.prepare(`SELECT v FROM meta WHERE k = 'faze_block'`).first();
+      } catch (_) { /* tables not created yet */ }
+      return { watched, events: ev.results, scannedToBlock: scanned ? Number(scanned.v) : null, watchDays: WATCH_DAYS };
+    }));
+  }
   if (p === "/api/csv") {
     const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts >= ? ORDER BY ts`).bind(since).all();
     const lines = [COLS.join(",")].concat(r.results.map(x => COLS.map(c => x[c] ?? "").join(",")));
     return new Response(lines.join("\n"), { headers: { "content-type": "text/csv", "content-disposition": `attachment; filename=riptide-${days}d.csv`, ...CORS } });
   }
-  return json({ name: "Riptide", endpoints: ["/api/latest", "/api/summary?days=7", "/api/series?days=7&size=1000", "/api/opps?days=7", "/api/events?days=7", "/api/csv?days=7"] });
+  return json({ name: "Riptide", endpoints: ["/api/latest", "/api/summary?days=7", "/api/series?days=7&size=1000", "/api/opps?days=7", "/api/events?days=7", "/api/faze?days=7", "/api/csv?days=7"] });
 }
 
 let schemaReady = false;
@@ -327,17 +371,21 @@ let schemaReady = false;
 export default {
   async scheduled(_event, env, ctx) {
     ctx.waitUntil((async () => {
-      if (!schemaReady) { await ensureSchema(env, COLS, BUCKET); schemaReady = true; }
+      if (!schemaReady) { await ensureSchema(env, COLS, BUCKET); await ensureFazeSchema(env); schemaReady = true; }
       const rows = await sample(env);
       const ts = rows[0] ? rows[0].ts : Math.floor(Date.now() / 1000);
       // Rug alarm: read every watched pool, log sudden price drops / liquidity pulls, pause those pairs.
       const endpoints = [env.ARC_RPC_URL, ARC_RPC].filter(Boolean);
-      const events = await checkPools(env, ts, rpcBatch, endpoints).catch(e => { console.log("rug check failed: " + (e.message || e)); return []; });
+      // Faze: pick up new launches and graduations, then watch freshly graduated pools along with the fixed list.
+      const faze = await scanFaze(env, rpcBatch, endpoints).catch(e => { console.log("faze scan failed: " + (e.message || e)); return []; });
+      const extra = await graduatedWatch(env, ts).catch(() => []);
+      const events = await checkPools(env, ts, rpcBatch, endpoints, extra).catch(e => { console.log("rug check failed: " + (e.message || e)); return []; });
       const paused = await pausedPairs(env, ts);
       for (const r of rows) { const p = paused.get(r.pair); if (p) { r.alert = "paused: " + p.kind; r.would_trade = 0; } else r.alert = null; }
       await store(env, rows);
       const errs = [...new Set(rows.map(r => r.error).filter(Boolean))];
       console.log(`riptide: saved ${rows.length} rows` + (errs.length ? `; issues: ${errs.join(" | ")}` : "; all sources ok")
+        + (faze.length ? `; faze: ${faze.map(e => `${e.kind} ${e.symbol || e.token}`).join(", ")}` : "")
         + (events.length ? `; ALARM: ${events.map(e => `${e.w.pair} ${e.w.pool} ${e.kind} ${(e.change * 100).toFixed(0)}%`).join(", ")}` : ""));
       // Keep 30 days.
       const cutoff = Math.floor(Date.now() / 1000) - 30 * 86400;

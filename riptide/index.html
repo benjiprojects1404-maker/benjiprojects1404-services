@@ -18,7 +18,7 @@
   --gold:#d9b45a; --gold-2:#ecd08a; --gold-ink:#1b1406; --gold-soft:rgba(217,180,90,.11);
   --metal:linear-gradient(135deg,#f3dc9a 0%,#d9b45a 38%,#b48a35 62%,#e6c97d 100%);
   --green:#57c094; --green-tint:rgba(87,192,148,.13); --red:#e07a6a; --red-tint:rgba(224,122,106,.12);
-  --l1:#e3c06a; --l2:#6aa8e0; --l3:#ee8a5c; --l4:#c48ae6;
+  --l1:#e3c06a; --l2:#6aa8e0; --l3:#ee8a5c; --l4:#c48ae6; --l5:#57c094;
   --grid:#232624; --serif:"Cormorant Garamond",Georgia,serif;
   --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
 }
@@ -81,7 +81,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 
 <main>
   <h1>Riptide</h1>
-  <p class="lede">Every minute, Riptide asks Arc's Uniswap pools what a $10 and a $1,000 trade would really return, compares that with Binance and Coinbase (or, for ARGUS, with Arc's other Uniswap pools), and logs every gap after fees. It is a paper-trading experiment: it never trades, holds no funds and has no keys.</p>
+  <p class="lede">Every minute, Riptide asks Arc's Uniswap pools what a $10 and a $1,000 trade would really return, compares that with Binance and Coinbase (or, for ARGUS and FAZE, with Arc's other Uniswap pools), and logs every gap after fees. It also keeps watch on Faze, Arc's memecoin launchpad. It is a paper-trading experiment: it never trades, holds no funds and has no keys.</p>
 
   <div class="notice" id="setupNotice" hidden>The monitor isn't connected yet. Once the Riptide Worker is deployed, live numbers appear here.</div>
 
@@ -141,11 +141,28 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
   </section>
 
   <section class="card">
+    <h2>Faze watch</h2>
+    <p class="sub">Faze (faze.fun) is a memecoin launchpad on Arc: each coin starts on a bonding curve and, if it fills, "graduates" into a locked Uniswap v4 pool. Riptide reads the live coins' pools every minute and logs every launch and graduation. Monitoring only: these are thin, volatile memecoins, and nothing here is a signal to buy.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Coin</th><th>Pool</th><th class="n">Price</th><th class="n">24 h</th><th class="n">Pool liquidity, 24 h</th></tr></thead>
+      <tbody id="fazeBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+    <h3 style="font-size:22px;margin:20px 0 4px;color:var(--gold-2)">Launches and graduations</h3>
+    <p class="sub" id="fazeEvSub">Read straight from Faze's contracts on Arc. Each newly graduated pool is added to the rug alarm for a week.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Time</th><th>What happened</th><th>Coin</th><th>Paired with</th><th class="n">Seeded</th></tr></thead>
+      <tbody id="fazeEvBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
+    </table></div>
+  </section>
+
+  <section class="card">
     <h2>How it counts, and what it leaves out</h2>
     <ul class="plain">
       <li><b>Arc prices are real quotes</b> from Uniswap v3's QuoterV2, so they already include the pool fee and the slippage for that trade size.</li>
       <li><b>Exchange prices</b> are the best bid and ask: Binance BTC/USDC and ETH/USDC where reachable, otherwise Coinbase BTC/USD and ETH/USD (USDC converts 1:1 to USD there), and Coinbase EURC/USDC (Binance has no EURC market). Binance blocks some server regions, including the one Riptide runs in, so Coinbase is usually the reference.</li>
       <li><b>ARGUS is compared Arc against Arc:</b> it has no exchange listing, so Riptide buys in Arc's Uniswap v3 pool and sells the same tokens in a Uniswap v4 pool (and the reverse), using chained real quotes. Both legs settle on Arc, so there's no exchange fee and no transfer, only the two pools' fees (about 1% each) and two swaps' gas. It only watches the v4 pools with real liquidity and normal fees; most of the ~170 ARGUS/USDC v4 pools are empty or charge 20–50%.</li>
+      <li><b>FAZE is compared Arc against Arc too:</b> Riptide buys in Faze's own pool (native USDC against FAZE, where Faze's hook takes a 2.5% fee) and sells in the deepest plain Uniswap v4 FAZE/USDC pool (5% fee), and the reverse. With about 7.5% of fees across the two legs, a gap that beats costs should be rare; the point is to measure how far apart the pools drift.</li>
+      <li><b>Faze watch:</b> FAZE and Arcflow (AF) are the two Faze coins with real trading. Their pools are in the rug alarm, and every coin that graduates is added for its first week. Launches and graduations come from Faze's bonding-curve and migrator contracts' public events.</li>
       <li><b>Rug alarm:</b> on a DEX a rug pull happens in a single transaction, far faster than any stop-loss can react, so Riptide doesn't pretend to exit. It flags the warning signs instead and pauses the pair, because a huge "gap" during a rug is a trap, not an opportunity.</li>
       <li><b>Costs subtracted:</b> the exchange's taker fee (assumed <span id="feeList">0.1% Binance, 0.6% Coinbase</span>; your own tier may be lower) and Arc network fees at the live gas price.</li>
       <li><b>Not counted:</b> moving funds between Arc and an exchange. Withdrawal and bridge fees, and the minutes or hours a transfer takes, are usually the real barrier, so a "would trade" here is an upper bound, not a promise.</li>
@@ -157,7 +174,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 </main>
 
 <footer>
-  Riptide by <a href="../">Undercurrent Works</a> · Data: Arc mainnet (Uniswap v3), Binance and Coinbase public APIs · <a href="https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/riptide">Source</a> · Sister tool: <a href="https://chordotc.com/crescent/">Crescent</a>
+  Riptide by <a href="../">Undercurrent Works</a> · Data: Arc mainnet (Uniswap v3 and v4, Faze's public contracts), Binance and Coinbase public APIs · <a href="https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/riptide">Source</a> · Sister tool: <a href="https://chordotc.com/crescent/">Crescent</a>
 </footer>
 
 <script>
@@ -165,12 +182,12 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 // Set this to the deployed Worker's address. ?api=https://... overrides it for testing.
 const DEFAULT_API = "https://riptide.benjiprojects1404.workers.dev";
 const API = (new URLSearchParams(location.search).get("api") || DEFAULT_API).replace(/\/$/, "");
-const COLORS = { cirBTC: "var(--l1)", EURC: "var(--l2)", WETH: "var(--l3)", ARGUS: "var(--l4)" };
+const COLORS = { cirBTC: "var(--l1)", EURC: "var(--l2)", WETH: "var(--l3)", ARGUS: "var(--l4)", FAZE: "var(--l5)" };
 const $ = id => document.getElementById(id);
 const pct = (v, d = 2) => v == null ? "–" : (v * 100).toFixed(d) + "%";
 const sPct = v => v == null ? "–" : `<span class="${v > 0 ? "pos" : "neg"}">${v > 0 ? "+" : ""}${(v * 100).toFixed(2)}%</span>`;
 const money = v => v == null ? "–" : (v < 0 ? "−$" : "$") + Math.abs(v).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const price = v => v == null ? "–" : v >= 100 ? v.toLocaleString("en-GB", { maximumFractionDigits: 2 }) : v.toFixed(5);
+const price = v => v == null ? "–" : v >= 100 ? v.toLocaleString("en-GB", { maximumFractionDigits: 2 }) : v >= 0.01 ? v.toFixed(5) : v.toPrecision(3);
 const when = t => new Date(t * 1000).toLocaleString("en-GB", { dateStyle: "short", timeStyle: "short" });
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let size = 1000, days = 7, showAllOpps = false;
@@ -241,6 +258,24 @@ async function loadEvents() {
     : `<tr><td colspan="5" class="empty">No alarms in this period.</td></tr>`;
 }
 
+async function loadFaze() {
+  const j = await get(`/api/faze?days=${days}`);
+  const w = j.watched || [];
+  $("fazeBody").innerHTML = w.length ? w.map(r => {
+    const ch = r.price != null && r.price24h ? r.price / r.price24h - 1 : null;
+    const unit = r.quote === "USDC" ? "$" : "";
+    return `<tr><td>${esc(r.pair)}</td><td>${esc(r.pool)}</td><td class="n">${r.price == null ? "–" : unit + price(r.price) + (r.quote === "USDC" ? "" : " FAZE")}</td>
+      <td class="n">${ch == null ? "–" : sPct(ch)}</td><td class="n">${r.liqChange24h == null ? "–" : sPct(r.liqChange24h)}</td></tr>`;
+  }).join("") : `<tr><td colspan="5" class="empty">No readings yet.</td></tr>`;
+  const ev = j.events || [];
+  $("fazeEvSub").textContent = `Read straight from Faze's contracts on Arc${j.scannedToBlock ? " (up to block " + j.scannedToBlock.toLocaleString("en-GB") + ")" : ""}. Each newly graduated pool is added to the rug alarm for ${j.watchDays || 7} days.`;
+  const pairedWith = q => !q ? "–" : /^0x0{40}$/i.test(q) ? "USDC" : q.toLowerCase() === "0x394d38f807ee0027a182216f5e67a15ae441fa2e" ? "FAZE" : q.slice(0, 8) + "…";
+  $("fazeEvBody").innerHTML = ev.length ? ev.map(r => `<tr><td>${when(r.ts)}</td><td>${r.kind === "graduate" ? '<span class="yes">Graduated</span>' : "Launched"}</td>
+    <td>${esc(r.symbol || "?")}${r.name && r.name !== r.symbol ? ` <span class="no">${esc(r.name)}</span>` : ""}</td><td>${pairedWith(r.quote)}</td>
+    <td class="n">${r.quote_seeded ? Math.round(r.quote_seeded).toLocaleString("en-GB") + " " + pairedWith(r.quote) : "–"}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">None in this period yet.</td></tr>`;
+}
+
 async function loadChart() {
   const j = await get(`/api/series?days=${days}&size=${size}`);
   const svg = $("chart"), W = svg.clientWidth || 900, H = 300, L = 54, R = 70, T = 12, B = 28;
@@ -290,7 +325,7 @@ async function refresh(withLatest = true, heavy = true) {
     if (API.includes("REPLACE_WITH")) throw new Error("not configured");
     const last = withLatest ? await loadLatest() : true;
     // Latest prices and rug alarms every minute; summary, chart and hits every 15 minutes (they change slowly).
-    await Promise.all(heavy ? [loadSummary(), loadOpps(), loadChart(), loadEvents().catch(() => {})] : [loadEvents().catch(() => {})]);
+    await Promise.all(heavy ? [loadSummary(), loadOpps(), loadChart(), loadEvents().catch(() => {}), loadFaze().catch(() => {})] : [loadEvents().catch(() => {}), loadFaze().catch(() => {})]);
     $("setupNotice").hidden = true;
     const fresh = last && last !== true && Date.now() / 1000 - last < 300;
     $("statusPill").textContent = last === null ? "Waiting for first check" : fresh ? "Live · checks every minute" : last === true ? $("statusPill").textContent : "Paused";
@@ -298,7 +333,7 @@ async function refresh(withLatest = true, heavy = true) {
   } catch (e) {
     $("setupNotice").hidden = false;
     $("statusPill").textContent = "Not connected";
-    for (const id of ["latestBody", "sumBody", "oppBody", "rugBody"]) $(id).innerHTML = `<tr><td colspan="8" class="empty">Waiting for the monitor.</td></tr>`;
+    for (const id of ["latestBody", "sumBody", "oppBody", "rugBody", "fazeBody", "fazeEvBody"]) $(id).innerHTML = `<tr><td colspan="8" class="empty">Waiting for the monitor.</td></tr>`;
   }
 }
 refresh();
