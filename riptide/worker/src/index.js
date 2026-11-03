@@ -303,7 +303,7 @@ async function api(url, env) {
   const since = Math.floor(Date.now() / 1000) - days * 86400;
 
   if (p === "/api/latest") {
-    const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts = (SELECT MAX(ts) FROM samples) ORDER BY pair, size`).all();
+    const r = await cached("latest", 30, () => env.DB.prepare(`SELECT * FROM samples WHERE ts = (SELECT MAX(ts) FROM samples) ORDER BY pair, size`).all());
     return json({ rows: r.results, pairs: PAIRS.map(({ id, ref, sym, cexFee, poolFee }) => ({ id, ref, sym, cexFee, poolFee })),
       rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
   }
@@ -334,7 +334,7 @@ async function api(url, env) {
   }
   if (p === "/api/events") {
     let r = { results: [] };
-    try { r = await env.DB.prepare(`SELECT * FROM events WHERE ts >= ? ORDER BY ts DESC LIMIT 200`).bind(since).all(); } catch (_) { /* table not created yet */ }
+    try { r = await cached(`events:${days}`, 60, () => env.DB.prepare(`SELECT * FROM events WHERE ts >= ? ORDER BY ts DESC LIMIT 200`).bind(since).all()); } catch (_) { /* table not created yet */ }
     return json({ rows: r.results, rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
   }
   if (p === "/api/faze") {
@@ -359,9 +359,21 @@ async function api(url, env) {
     }));
   }
   if (p === "/api/csv") {
-    const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts >= ? ORDER BY ts`).bind(since).all();
-    const lines = [COLS.join(",")].concat(r.results.map(x => COLS.map(c => x[c] ?? "").join(",")));
-    return new Response(lines.join("\n"), { headers: { "content-type": "text/csv", "content-disposition": `attachment; filename=riptide-${days}d.csv`, ...CORS } });
+    // Each download reads every sample in the window (tens of thousands of rows a day), so cap it at
+    // 7 days and serve the same file for an hour, from the edge cache as well as this isolate.
+    const d = Math.min(days, 7), from = Math.floor(Date.now() / 1000) - d * 86400;
+    const cacheKey = new Request(`https://riptide-cache/csv?days=${d}`);
+    const edge = caches.default;
+    const hit = await edge.match(cacheKey);
+    if (hit) return hit;
+    const body = await cached(`csv:${d}`, 3600, async () => {
+      const r = await env.DB.prepare(`SELECT * FROM samples WHERE ts >= ? ORDER BY ts`).bind(from).all();
+      return [COLS.join(",")].concat(r.results.map(x => COLS.map(c => x[c] ?? "").join(","))).join("\n");
+    });
+    const res = new Response(body, { headers: { "content-type": "text/csv", "content-disposition": `attachment; filename=riptide-${d}d.csv`,
+      ...CORS, "cache-control": "public, max-age=3600" } });
+    await edge.put(cacheKey, res.clone());
+    return res;
   }
   return json({ name: "Riptide", endpoints: ["/api/latest", "/api/summary?days=7", "/api/series?days=7&size=1000", "/api/opps?days=7", "/api/events?days=7", "/api/faze?days=7", "/api/csv?days=7"] });
 }
@@ -387,7 +399,8 @@ export default {
       console.log(`riptide: saved ${rows.length} rows` + (errs.length ? `; issues: ${errs.join(" | ")}` : "; all sources ok")
         + (faze.length ? `; faze: ${faze.map(e => `${e.kind} ${e.symbol || e.token}`).join(", ")}` : "")
         + (events.length ? `; ALARM: ${events.map(e => `${e.w.pair} ${e.w.pool} ${e.kind} ${(e.change * 100).toFixed(0)}%`).join(", ")}` : ""));
-      // Keep 30 days.
+      // Keep 30 days. Once an hour is plenty for this.
+      if (new Date().getUTCMinutes() !== 7) return;
       const cutoff = Math.floor(Date.now() / 1000) - 30 * 86400;
       await env.DB.batch(["samples", "pool_state", "events", "opps"].map(t => env.DB.prepare(`DELETE FROM ${t} WHERE ts < ?`).bind(cutoff))
         .concat(env.DB.prepare(`DELETE FROM rollup WHERE bucket < ?`).bind(cutoff)));
@@ -396,6 +409,7 @@ export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method !== "GET") return json({ error: "read-only" }, 405);
+    if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /api/csv\n", { headers: { "content-type": "text/plain" } });
     try { return await api(url, env); } catch (e) { return json({ error: String(e.message || e) }, 500); }
   },
 };

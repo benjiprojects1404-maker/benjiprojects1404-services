@@ -43,6 +43,8 @@ export async function ensureSchema(env, COLS, BUCKET) {
   await env.DB.batch([
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS pool_state (ts INTEGER NOT NULL, pair TEXT NOT NULL, pool TEXT NOT NULL, price REAL, liq REAL)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_pool_state ON pool_state (pool, pair, ts)`),
+    // The retention DELETE filters on ts alone; without this it scans the whole table.
+    env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_pool_state_ts ON pool_state (ts)`),
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS events (ts INTEGER NOT NULL, pair TEXT NOT NULL, pool TEXT NOT NULL, kind TEXT NOT NULL,
       change REAL, before REAL, after REAL)`),
     env.DB.prepare(`CREATE INDEX IF NOT EXISTS idx_events_ts ON events (ts)`),
