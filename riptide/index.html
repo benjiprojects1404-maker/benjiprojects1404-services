@@ -141,8 +141,8 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
   </section>
 
   <section class="card">
-    <h2>Faze watch</h2>
-    <p class="sub">Faze (faze.fun) is a memecoin launchpad on Arc: each coin starts on a bonding curve and, if it fills, "graduates" into a locked Uniswap v4 pool. Riptide reads the live coins' pools every minute and logs every launch and graduation. Monitoring only: these are thin, volatile memecoins, and nothing here is a signal to buy.</p>
+    <h2>Coin watch</h2>
+    <p class="sub">Arc-native coins with no exchange listing. Faze (faze.fun) is a memecoin launchpad on Arc: each coin starts on a bonding curve and, if it fills, "graduates" into a locked Uniswap v4 pool. Riptide reads these coins' pools every minute, along with ArcStocks (ASTOCK), and logs every Faze launch and graduation. Monitoring only: these are thin, volatile memecoins, and nothing here is a signal to buy.</p>
     <div class="tablewrap"><table>
       <thead><tr><th>Coin</th><th>Pool</th><th class="n">Price</th><th class="n">24 h</th><th class="n">Pool liquidity, 24 h</th></tr></thead>
       <tbody id="fazeBody"><tr><td colspan="5" class="empty">Loading…</td></tr></tbody>
@@ -163,6 +163,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
       <li><b>ARGUS is compared Arc against Arc:</b> it has no exchange listing, so Riptide buys in Arc's Uniswap v3 pool and sells the same tokens in a Uniswap v4 pool (and the reverse), using chained real quotes. Both legs settle on Arc, so there's no exchange fee and no transfer, only the two pools' fees (about 1% each) and two swaps' gas. It only watches the v4 pools with real liquidity and normal fees; most of the ~170 ARGUS/USDC v4 pools are empty or charge 20–50%.</li>
       <li><b>FAZE is compared Arc against Arc too:</b> Riptide buys in Faze's own pool (native USDC against FAZE, where Faze's hook takes a 2.5% fee) and sells in the deepest plain Uniswap v4 FAZE/USDC pool (5% fee), and the reverse. With about 7.5% of fees across the two legs, a gap that beats costs should be rare; the point is to measure how far apart the pools drift.</li>
       <li><b>Faze watch:</b> FAZE and Arcflow (AF) are the two Faze coins with real trading. Their pools are in the rug alarm, and every coin that graduates is added for its first week. Launches and graduations come from Faze's bonding-curve and migrator contracts' public events.</li>
+      <li><b>ASTOCK (ArcStocks)</b> has one Uniswap v4 ASTOCK/USDC pool and no exchange listing, so there is nothing to compare it with. Riptide reads its price and liquidity every minute and includes the pool in the rug alarm.</li>
       <li><b>Rug alarm:</b> on a DEX a rug pull happens in a single transaction, far faster than any stop-loss can react, so Riptide doesn't pretend to exit. It flags the warning signs instead and pauses the pair, because a huge "gap" during a rug is a trap, not an opportunity.</li>
       <li><b>Costs subtracted:</b> the exchange's taker fee (assumed <span id="feeList">0.1% Binance, 0.6% Coinbase</span>; your own tier may be lower) and Arc network fees at the live gas price.</li>
       <li><b>Not counted:</b> moving funds between Arc and an exchange. Withdrawal and bridge fees, and the minutes or hours a transfer takes, are usually the real barrier, so a "would trade" here is an upper bound, not a promise.</li>

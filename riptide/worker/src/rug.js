@@ -25,6 +25,10 @@ export const WATCH = [
   // through Faze's launchpad hook, which takes the trading fee. Pool ids checked on Arc mainnet, 2 Nov 2026.
   { pair: "FAZE",   pool: "Faze pool", kind: "v4", id: "0xd9133187331e20885fd1b4ff2f18b892f94793ddaf808b1db6d4ef29ca58b943", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18, quote: NATIVE, qdec: 18 },
   { pair: "FAZE",   pool: "v4 5%",     kind: "v4", id: "0xcb4925117715e6983ee6e03d491d90bbc498776b761714c447a9ea80265ca846", token: "0x394d38f807ee0027a182216f5e67a15ae441fa2e", dec: 18 },
+  // ArcStocks (ASTOCK), added 4 Nov 2026: no exchange listing and one Uniswap v4 ASTOCK/USDC pool, so it is watched
+  // (price, liquidity, rug alarm) rather than compared. Pool and quote currency checked with scripts/check-pool.js.
+  // show: listed in the dashboard's coin watch table.
+  { pair: "ASTOCK", pool: "v4",        kind: "v4", id: "0x1bb5c22ae4560dc887164d96ebeaa756130948314ce132fee3c8d14e5b95758b", token: "0x4c9b47dbd5933aa4574b2c27f82419e4dbbd0222", dec: 18, show: true },
   { pair: "AF",     pool: "Faze pool", kind: "v4", id: "0x1c0523377296238f6a2fd25cb3b15f75e280eb330ad29f843b974eec264dfe31", token: "0x75d658f8101fbe6dc217fbba7e20a0312af5fa2e", dec: 18, quote: NATIVE, qdec: 18 },
 ];
 
