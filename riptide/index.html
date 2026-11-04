@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Riptide · Arc price-gap monitor</title>
-<meta name="description" content="Riptide watches Arc's Uniswap pools against Binance and Coinbase every minute and logs every price gap after real costs. Paper trading only: it never trades.">
+<meta name="description" content="Riptide watches Uniswap pools on Arc against Binance and Coinbase every minute and logs every price gap after real costs. Paper trading only: it never trades.">
 <link rel="icon" href="mark.svg" type="image/svg+xml">
 <meta name="theme-color" content="#090a0a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -81,7 +81,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 
 <main>
   <h1>Riptide</h1>
-  <p class="lede">Every minute, Riptide asks Arc's Uniswap pools what a $10 and a $1,000 trade would really return, compares that with Binance and Coinbase (or, for ARGUS and FAZE, with Arc's other Uniswap pools), and logs every gap after fees. It also keeps watch on Faze, Arc's memecoin launchpad. It is a paper-trading experiment: it never trades, holds no funds and has no keys.</p>
+  <p class="lede">Every minute, Riptide asks Uniswap pools on Arc what a $10 and a $1,000 trade would really return, compares that with Binance and Coinbase (or, for ARGUS and FAZE, with other Uniswap pools on Arc), and logs every gap after fees. It also keeps watch on Faze, a memecoin launchpad on Arc. It is a paper-trading experiment: it never trades, holds no funds and has no keys.</p>
 
   <div class="notice" id="setupNotice" hidden>The monitor isn't connected yet. Once the Riptide Worker is deployed, live numbers appear here.</div>
 
@@ -160,7 +160,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
     <ul class="plain">
       <li><b>Arc prices are real quotes</b> from Uniswap v3's QuoterV2, so they already include the pool fee and the slippage for that trade size.</li>
       <li><b>Exchange prices</b> are the best bid and ask: Binance BTC/USDC and ETH/USDC where reachable, otherwise Coinbase BTC/USD and ETH/USD (USDC converts 1:1 to USD there), and Coinbase EURC/USDC (Binance has no EURC market). Binance blocks some server regions, including the one Riptide runs in, so Coinbase is usually the reference.</li>
-      <li><b>ARGUS is compared Arc against Arc:</b> it has no exchange listing, so Riptide buys in Arc's Uniswap v3 pool and sells the same tokens in a Uniswap v4 pool (and the reverse), using chained real quotes. Both legs settle on Arc, so there's no exchange fee and no transfer, only the two pools' fees (about 1% each) and two swaps' gas. It only watches the v4 pools with real liquidity and normal fees; most of the ~170 ARGUS/USDC v4 pools are empty or charge 20–50%.</li>
+      <li><b>ARGUS is compared Arc against Arc:</b> it has no exchange listing, so Riptide buys in the Uniswap v3 pool on Arc and sells the same tokens in a Uniswap v4 pool (and the reverse), using chained real quotes. Both legs settle on Arc, so there's no exchange fee and no transfer, only the two pools' fees (about 1% each) and two swaps' gas. It only watches the v4 pools with real liquidity and normal fees; most of the ~170 ARGUS/USDC v4 pools are empty or charge 20–50%.</li>
       <li><b>FAZE is compared Arc against Arc too:</b> Riptide buys in Faze's own pool (native USDC against FAZE, where Faze's hook takes a 2.5% fee) and sells in the deepest plain Uniswap v4 FAZE/USDC pool (5% fee), and the reverse. With about 7.5% of fees across the two legs, a gap that beats costs should be rare; the point is to measure how far apart the pools drift.</li>
       <li><b>Faze watch:</b> FAZE and Arcflow (AF) are the two Faze coins with real trading. Their pools are in the rug alarm, and every coin that graduates is added for its first week. Launches and graduations come from Faze's bonding-curve and migrator contracts' public events.</li>
       <li><b>ASTOCK (ArcStocks)</b> has one Uniswap v4 ASTOCK/USDC pool and no exchange listing, so there is nothing to compare it with. Riptide reads its price and liquidity every minute and includes the pool in the rug alarm.</li>
@@ -176,6 +176,7 @@ footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font
 
 <footer>
   Riptide by <a href="../">Undercurrent Works</a> · Data: Arc mainnet (Uniswap v3 and v4, Faze's public contracts), Binance and Coinbase public APIs · <a href="https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/riptide">Source</a> · Sister tool: <a href="https://chordotc.com/crescent/">Crescent</a>
+  <br>Built on Arc&trade;. Riptide is independent and not made or endorsed by Circle. Arc is a trademark of Circle Internet Group, Inc. and/or its affiliates.
 </footer>
 
 <script>
