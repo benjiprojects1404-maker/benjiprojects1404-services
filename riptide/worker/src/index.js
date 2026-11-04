@@ -338,15 +338,16 @@ async function api(url, env) {
     return json({ rows: r.results, rugAlarm: { priceDrop: PRICE_DROP, liquidityDrop: LIQ_DROP, pauseMinutes: PAUSE_MIN } });
   }
   if (p === "/api/faze") {
-    // Faze coins Riptide reads every minute (latest price and liquidity, and price 24 h ago), plus launches and graduations.
+    // Coins Riptide reads every minute (Faze coins, plus WATCH entries marked show: latest price and liquidity, and
+    // price 24 h ago), plus Faze launches and graduations.
     return json(await cached(`faze:${days}`, 60, async () => {
       const now = Math.floor(Date.now() / 1000);
-      const pools = WATCH.filter(w => w.pool === "Faze pool").concat(await graduatedWatch(env, now));
+      const pools = WATCH.filter(w => w.pool === "Faze pool" || w.show).concat(await graduatedWatch(env, now));
       const watched = [];
       for (const w of pools) {
         const last = await env.DB.prepare(`SELECT ts, price, liq FROM pool_state WHERE pool = ? AND pair = ? ORDER BY ts DESC LIMIT 1`).bind(w.pool, w.pair).first();
         const dayAgo = await env.DB.prepare(`SELECT price, liq FROM pool_state WHERE pool = ? AND pair = ? AND ts >= ? ORDER BY ts LIMIT 1`).bind(w.pool, w.pair, now - 86400).first();
-        watched.push({ pair: w.pair, pool: w.pool, token: w.token, quote: w.quote === "0x0000000000000000000000000000000000000000" ? "USDC" : "FAZE",
+        watched.push({ pair: w.pair, pool: w.pool, token: w.token, quote: !w.quote || /^0x(0{40}|360{38})$/i.test(w.quote) ? "USDC" : "FAZE",
           ts: last ? last.ts : null, price: last ? last.price : null, price24h: dayAgo ? dayAgo.price : null,
           liqChange24h: last && dayAgo && dayAgo.liq > 0 ? last.liq / dayAgo.liq - 1 : null });
       }
