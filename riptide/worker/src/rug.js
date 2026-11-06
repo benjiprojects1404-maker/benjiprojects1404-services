@@ -1,6 +1,11 @@
 // Rug alarm: watches every pool Riptide quotes for the two signs of a rug pull, minute by minute.
 //   - a sudden price drop (>= PRICE_DROP between two checks), or
 //   - liquidity pulled (>= LIQ_DROP of the pool's liquidity gone between two checks, or the pool empty).
+//     On v4 pools Riptide reads ACTIVE liquidity (only positions covering the current price). That also falls
+//     when the price simply moves past where LPs set their ranges, with nobody withdrawing anything. So a v4
+//     liquidity drop only counts when the price barely moved (< MOVE_TOL); a drop that comes with a big price
+//     fall is still caught by the price-drop alarm. Checked against ARGUS 3-6 Nov 2026: every v4 alarm then
+//     lined up with swaps moving the price ~1-4% and no large withdrawal.
 // When either fires, the event is logged and that pair is paused for PAUSE_MIN minutes: its rows are marked
 // and can't count as "would trade", because a huge apparent gap during a rug is a trap, not an opportunity.
 // Read-only like the rest of Riptide: it only reads pool state.
@@ -8,6 +13,7 @@
 export const PRICE_DROP = 0.20;
 export const LIQ_DROP = 0.50;
 export const PAUSE_MIN = 60;
+export const MOVE_TOL = 0.005; // v4: price move (0.5%, ~50 ticks) above which a liquidity drop is treated as a range shift
 
 const USDC = "0x3600000000000000000000000000000000000000";
 const NATIVE = "0x0000000000000000000000000000000000000000";
@@ -34,6 +40,8 @@ export const WATCH = [
 
 const addrWord = a => a.toLowerCase().replace(/^0x/, "").padStart(64, "0");
 const first = r => (r && r.length >= 66 ? BigInt(r.slice(0, 66)) : null);
+// True when the price hardly moved between two readings (both known).
+export const steady = (a, b) => a > 0 && b > 0 && Math.abs(b / a - 1) < MOVE_TOL;
 
 // Price of the token in its quote currency (USD for USDC or native USDC) from a Uniswap sqrtPriceX96
 // (token1 per token0, in base units). quote defaults to the USDC ERC-20 (6 decimals).
@@ -124,7 +132,7 @@ export async function checkPools(env, ts, rpcBatch, endpoints, extra = []) {
     const prev = await env.DB.prepare(`SELECT price, liq FROM pool_state WHERE pool = ? AND pair = ? ORDER BY ts DESC LIMIT 1`).bind(w.pool, w.pair).first();
     if (prev) {
       if (prev.liq > 0 && liq <= 0) events.push({ w, kind: "pool_empty", change: -1, before: prev.liq, after: liq });
-      else if (prev.liq > 0 && liq / prev.liq - 1 <= -LIQ_DROP) events.push({ w, kind: "liquidity_drop", change: liq / prev.liq - 1, before: prev.liq, after: liq });
+      else if (prev.liq > 0 && liq / prev.liq - 1 <= -LIQ_DROP && (w.kind === "v3" || steady(prev.price, price))) events.push({ w, kind: "liquidity_drop", change: liq / prev.liq - 1, before: prev.liq, after: liq });
       if (prev.price > 0 && price && price / prev.price - 1 <= -PRICE_DROP) events.push({ w, kind: "price_drop", change: price / prev.price - 1, before: prev.price, after: price });
     }
   }
