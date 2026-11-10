@@ -3,23 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A1612">
 <title>Security review · Reef, Nodal, Handshake, $COOKED</title>
 <meta name="description" content="AI-assisted security review of the live Reef, Nodal, Handshake and $COOKED contracts on BlockDAG (chain 1404), 2 October 2026. Not an independent audit.">
 <meta property="og:title" content="Security review: Reef, Nodal, Handshake, $COOKED">
 <meta property="og:description" content="Every live contract read line by line, tested, and matched to its published source on chain. No critical or high findings. Not an independent audit.">
-<meta property="og:image" content="/og-image.png">
+<meta property="og:image" content="https://benjiprojects1404-services.pages.dev/og-image.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://benjiprojects1404-services.pages.dev/security-review/">
+<meta property="og:site_name" content="Undercurrent Works">
 <meta property="og:type" content="article">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Security review: Reef, Nodal, Handshake, $COOKED">
+<meta name="twitter:description" content="Every live contract read line by line, tested, and matched to its published source on chain. Not an independent audit.">
+<meta name="twitter:image" content="https://benjiprojects1404-services.pages.dev/og-image.png?v=2">
 <link rel="canonical" href="https://benjiprojects1404-services.pages.dev/security-review/">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Spectral:wght@500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
-  :root{--paper:#F3F5F7;--sheet:#FFFFFF;--ink:#15212C;--muted:#5A6B78;--rule:#D3DBE2;--green:#0E6A4E;--green-tint:#E5F0EA;--amber:#8A5A12;--amber-tint:#FBF1E1;--red:#9B2C2C;--red-tint:#F9E6E6}
+  :root{--paper:#0A1612;--sheet:#10201B;--sheet2:#132722;--ink:#E8EFEC;--muted:#9CB1A8;--rule:#22392F;--green:#3CC897;--green-tint:#123127;--gold:#D9B45A;--amber:#E6B866;--amber-tint:#2A2212;--red:#F08A8A;--red-tint:#3A1A1C;--on-green:#06140F}
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.6 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+  body{margin:0;background:radial-gradient(ellipse 900px 520px at 10% -10%,#163A2E 0%,transparent 60%),var(--paper);background-repeat:no-repeat;background-color:var(--paper);color:var(--ink);font:400 17px/1.6 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
   a{color:var(--green)}
   a:focus-visible{outline:3px solid var(--green);outline-offset:3px;border-radius:4px}
   .wrap{max-width:960px;margin:0 auto;padding:0 24px}
@@ -27,7 +36,7 @@
   code,.mono{font:400 13.5px "JetBrains Mono",ui-monospace,monospace;overflow-wrap:anywhere}
   .top{display:flex;justify-content:space-between;align-items:center;padding:22px 0;gap:16px}
   .brand{font-family:"Spectral",Georgia,serif;font-weight:700;font-size:20px;color:var(--ink);text-decoration:none}
-  .brand span{color:var(--green)}
+  .brand span{color:var(--gold)}
   .top a.back{font-size:15px;color:var(--muted);text-decoration:none}
   header.intro{padding:40px 0 36px}
   .kicker{font-size:14px;font-weight:600;color:var(--green);letter-spacing:.04em;text-transform:uppercase;margin:0 0 10px}
@@ -37,13 +46,13 @@
   .stat{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:16px 18px}
   .stat b{display:block;font-family:"Spectral",Georgia,serif;font-size:30px;line-height:1.1}
   .stat span{font-size:14px;color:var(--muted)}
-  .notice{background:var(--amber-tint);border:1px solid #E8CFA3;border-radius:12px;padding:16px 18px;margin:28px 0 0;font-size:16px}
+  .notice{background:var(--amber-tint);border:1px solid #5A4724;border-radius:12px;padding:16px 18px;margin:28px 0 0;font-size:16px}
   .notice b{color:var(--amber)}
   section{padding:48px 0;border-top:1px solid var(--rule)}
   section h2{font-size:clamp(26px,3vw,34px);margin-bottom:12px}
   section > .wrap > p{max-width:68ch}
   .tbl{width:100%;border-collapse:collapse;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;overflow:hidden;font-size:15px}
-  .tbl th{text-align:left;font-size:13px;font-weight:600;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--rule);background:#F8FAFB}
+  .tbl th{text-align:left;font-size:13px;font-weight:600;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--rule);background:var(--sheet2)}
   .tbl td{padding:12px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
   .tbl tr:last-child td{border-bottom:none}
   .ok{color:var(--green);font-weight:600;white-space:nowrap}
@@ -51,13 +60,13 @@
   .sev{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
   .sev.m{background:var(--red-tint);color:var(--red)}
   .sev.l{background:var(--amber-tint);color:var(--amber)}
-  .sev.n{background:#EEF2F5;color:var(--muted)}
+  .sev.n{background:#1B2E28;color:var(--muted)}
   .scroll{overflow-x:auto;margin:18px 0 0;border-radius:12px}
   ol.steps{padding-left:22px;max-width:68ch}
   ol.steps li{margin:8px 0}
   .links{display:flex;flex-wrap:wrap;gap:12px;margin:18px 0 0}
   .btn{display:inline-block;padding:12px 20px;border-radius:8px;font-weight:600;font-size:16px;text-decoration:none}
-  .btn.primary{background:var(--green);color:#fff}
+  .btn.primary{background:var(--green);color:var(--on-green)}
   .btn.quiet{color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--rule)}
   footer{padding:36px 0 48px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;border-top:1px solid var(--rule)}
   @media (max-width:760px){
@@ -73,7 +82,7 @@
 <body>
 <div class="wrap">
   <div class="top">
-    <a class="brand" href="/">benji<span>projects</span>1404</a>
+    <a class="brand" href="/"><img src="../undercurrent-mark.svg" alt="" width="28" height="28" style="vertical-align:-7px;margin-right:9px">Undercurrent <span>Works</span></a>
     <a class="back" href="/#review">Get a review like this</a>
   </div>
 

@@ -3,25 +3,35 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A1612">
 <title>Undercurrent Works · Build &amp; launch on EVM chains</title>
 <meta name="description" content="Token launches on Ethereum, Base, BNB Chain, Arbitrum, Polygon, Circle's Arc and BlockDAG (chain 1404), built and checked properly: token, pool, liquidity lock, presale, airdrop, multisig and a plain-spoken site. Fixed prices, your keys throughout.">
 <meta property="og:title" content="Build & launch on EVM chains — Undercurrent Works">
 <meta property="og:description" content="Token, pool, liquidity lock, presale, airdrop, multisig and site. Fixed prices. You keep your keys.">
-<meta property="og:image" content="/og-image.png">
+<meta property="og:image" content="https://benjiprojects1404-services.pages.dev/og-image.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://benjiprojects1404-services.pages.dev/">
+<meta property="og:site_name" content="Undercurrent Works">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Build &amp; launch on EVM chains — Undercurrent Works">
+<meta name="twitter:description" content="Token, pool, liquidity lock, presale, airdrop, multisig and site. Fixed prices. You keep your keys.">
+<meta name="twitter:image" content="https://benjiprojects1404-services.pages.dev/og-image.png?v=2">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600&family=Spectral:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --paper:#F3F5F7; --sheet:#FFFFFF; --ink:#15212C; --muted:#5A6B78; --rule:#D3DBE2;
-    --green:#0E6A4E; --green-tint:#E5F0EA; --green-ink:#0A4F3A;
+    /* Dark theme from the Undercurrent mark: deep greens with a gold accent */
+    --paper:#0A1612; --sheet:#10201B; --sheet2:#132722; --ink:#E8EFEC; --ink2:#C9D7D1; --muted:#9CB1A8; --rule:#22392F;
+    --green:#3CC897; --green-tint:#123127; --green-ink:#2FB487; --gold:#D9B45A; --on-green:#06140F;
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
-  body{margin:0;background:var(--paper);color:var(--ink);font:400 17px/1.6 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+  body{margin:0;background:radial-gradient(ellipse 900px 520px at 10% -10%,#163A2E 0%,transparent 60%),radial-gradient(ellipse 800px 500px at 110% 0%,#2A2410 0%,transparent 55%),var(--paper);background-repeat:no-repeat;background-color:var(--paper);color:var(--ink);font:400 17px/1.6 "Public Sans",system-ui,sans-serif;font-variant-numeric:tabular-nums}
   a{color:var(--green)}
   a:focus-visible,button:focus-visible{outline:3px solid var(--green);outline-offset:3px;border-radius:4px}
   .wrap{max-width:1060px;margin:0 auto;padding:0 24px}
@@ -30,7 +40,7 @@
   /* top bar */
   .top{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
   .brand{font-family:"Spectral",Georgia,serif;font-weight:700;font-size:20px;color:var(--ink);text-decoration:none}
-  .brand span{color:var(--green)}
+  .brand span{color:var(--gold)}
   .top nav{display:flex;gap:22px;font-size:15px}
   .top nav a{color:var(--muted);text-decoration:none}
   .top nav a:hover{color:var(--ink)}
@@ -41,7 +51,7 @@
   .hero p.lede{font-size:19px;color:var(--muted);max-width:52ch;margin:22px 0 30px}
   .actions{display:flex;flex-wrap:wrap;gap:12px}
   .btn{display:inline-block;padding:13px 22px;border-radius:8px;font-weight:600;font-size:16px;text-decoration:none}
-  .btn.primary{background:var(--green);color:#fff}
+  .btn.primary{background:var(--green);color:var(--on-green)}
   .btn.primary:hover{background:var(--green-ink)}
   .btn.quiet{color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--rule)}
   .btn.quiet:hover{box-shadow:inset 0 0 0 1.5px var(--ink)}
@@ -64,13 +74,13 @@
 
   /* pricing table */
   .prices{width:100%;border-collapse:collapse;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
-  .prices th{text-align:left;font-size:14px;font-weight:600;color:var(--muted);padding:14px 20px;border-bottom:1px solid var(--rule);background:#F8FAFB}
+  .prices th{text-align:left;font-size:14px;font-weight:600;color:var(--muted);padding:14px 20px;border-bottom:1px solid var(--rule);background:var(--sheet2)}
   .prices td{padding:20px;border-bottom:1px solid var(--rule);vertical-align:top}
   .prices tr:last-child td{border-bottom:none}
   .prices td.name{width:22%}
   .prices td.name b{font-family:"Spectral",Georgia,serif;font-size:21px;font-weight:600;display:block}
   .prices td.name small{color:var(--muted);font-size:14px}
-  .prices td.inc{color:#33434F;font-size:16px}
+  .prices td.inc{color:var(--ink2);font-size:16px}
   .prices td.time{white-space:nowrap;color:var(--muted);font-size:15px;width:14%}
   .prices td.price{white-space:nowrap;text-align:right;width:16%;font-family:"Spectral",Georgia,serif;font-size:26px;font-weight:600}
   .prices td.price small{display:block;font-family:"Public Sans",sans-serif;font-size:13px;font-weight:400;color:var(--muted)}
@@ -91,7 +101,7 @@
   .rules p{margin:0;color:var(--muted);font-size:16px}
 
   /* contact */
-  .contact{background:var(--ink);color:#EAF0F4;border-radius:14px;padding:44px 44px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:40px;align-items:center}
+  .contact{background:linear-gradient(135deg,#123127,#0D211B);border:1px solid var(--rule);color:#EAF0F4;border-radius:14px;padding:44px 44px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr);gap:40px;align-items:center}
   .contact h2{font-size:clamp(28px,3.4vw,38px);color:#fff}
   .contact p{color:#AFC0CC;margin:12px 0 0}
   .contact dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:10px 18px;font-size:16px}
@@ -102,6 +112,22 @@
   .contact .btn.primary:hover{background:#3CC897}
   footer{padding:36px 0 48px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
 
+
+  /* hero summary + live work grid */
+  .facts{list-style:none;margin:6px 0 18px;padding:0}
+  .facts li{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:baseline;padding:12px 0;border-top:1px solid var(--rule)}
+  .facts li b{font-family:"Spectral",Georgia,serif;font-size:22px;color:var(--gold);font-weight:600}
+  .facts li span{color:var(--ink2);font-size:15px;line-height:1.45}
+  .btn.small{padding:10px 16px;font-size:15px}
+  .ledger{padding-bottom:22px}
+  .chain{font-size:15px;font-family:"Public Sans",sans-serif;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin:8px 0 14px}
+  .work-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:30px}
+  .work-card{display:flex;flex-direction:column;gap:6px;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:18px 18px 16px;text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+  .work-card:hover{border-color:var(--green);transform:translateY(-2px)}
+  .work-card b{font-weight:600;font-size:17px}
+  .work-card small{color:var(--muted);font-size:14px;line-height:1.5;flex:1}
+  .work-card span{color:var(--green);font-size:14px;font-weight:600;margin-top:4px}
+  @media (max-width:880px){.work-grid{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:880px){
     .hero{grid-template-columns:minmax(0,1fr);gap:36px;padding:28px 0 52px}
     .steps{grid-template-columns:minmax(0,1fr)}
@@ -125,6 +151,7 @@
   <header class="top">
     <a class="brand" href="/"><img src="undercurrent-mark.svg" alt="" width="28" height="28" style="vertical-align:-7px;margin-right:9px">Undercurrent <span>Works</span></a>
     <nav aria-label="Sections">
+      <a href="#work">Work</a>
       <a href="#prices">Prices</a>
       <a href="#review">Code review</a>
       <a href="#process">How it works</a>
@@ -144,25 +171,45 @@
     </div>
 
     <aside class="ledger" aria-labelledby="proof">
-      <h2 id="proof">Live on-chain today</h2>
-      <p class="sub">On Circle&rsquo;s Arc and BlockDAG (chain 1404). Built solo, open source, and checkable by anyone. <a href="/security-review/">Read the security review</a> (AI-assisted, not an independent audit).</p>
-      <ul>
-        <li><div><b>Reef</b><small>Permissionless DEX: pools, swaps and a 24-hour price oracle</small></div><a href="https://reefdex.fyi">reefdex.fyi</a></li>
-        <li><div><b>Nodal</b><small>Aggregator that routes each trade to the best source; router source verified</small></div><a href="https://nodaldex.fyi">nodaldex.fyi</a></li>
-        <li><div><b>Handshake</b><small>OTC escrow: both sides settle in one transaction, or nothing moves</small></div><a href="https://handshakeotc.fyi">handshakeotc.fyi</a></li>
-        <li><div><b>Chord OTC</b><small>Private OTC desk on Arc mainnet: both legs settle in one USDC transaction; verified contract, owned by a Safe multisig</small></div><a href="https://chordotc.com">chordotc.com</a></li>
-        <li><div><b>Arc wallet view</b><small>Read-only view of any Arc address: balances, full transfer history, CSV export. Nothing connected or signed. Part of Crescent</small></div><a href="https://chordotc.com/crescent/#activity">chordotc.com/crescent</a></li>
-        <li><div><b>Arc payment link</b><small>Payment link and QR code with a live paid check. Funds go straight to your address, never through a contract; the payer confirms in their own wallet. Part of Crescent</small></div><a href="https://chordotc.com/crescent/">chordotc.com/crescent</a></li>
-        <li><div><b>Riptide</b><small>Live Arc price-gap monitor: compares Arc's Uniswap pools with Coinbase every minute and logs every gap after fees. Read-only, paper trading only</small></div><a href="riptide/">riptide</a></li>
-        <li><div><b>Arc MCP</b><small>Read-only MCP server for Arc: lets Claude and other AI assistants read balances, quote Uniswap, check Riptide alerts and make Crescent payment links. Connect at /mcp</small></div><a href="https://arc-mcp.benjiprojects1404.workers.dev/">arc-mcp.workers.dev</a></li>
-        <li><div><b>$REEF</b><small>Reef&rsquo;s own token: fixed supply, presale with a refund fallback, airdrop and a 12-month liquidity lock</small></div><a href="https://reefdex.fyi/reef/">reefdex.fyi/reef</a></li>
-        <li><div><b>$COOKED</b><small>Fair-launch meme on a bonding curve: no owner, liquidity burned when it graduates</small></div><a href="https://cookedmeme.fyi">cookedmeme.fyi</a></li>
-        <li><div><b>NOCAP</b><small>Community token, ownership renounced, 99.99% of its liquidity time-locked</small></div><a href="https://www.nocapmeme.fyi">nocapmeme.fyi</a></li>
-        <li><div><b>COOKED &times; NOCAP Cards</b><small>150 stat-battle NFTs: every mint adds its full price to a Reef pool as burned liquidity, with a provably fair reveal and a free battle game</small></div><a href="https://reefdex.fyi/cards/">reefdex.fyi/cards</a></li>
+      <h2 id="proof">Built and running, not just pitched</h2>
+      <ul class="facts">
+        <li><b>12</b><span>live products on Circle&rsquo;s Arc and BlockDAG (chain 1404)</span></li>
+        <li><b>Open</b><span>source for every contract, checkable against the chain</span></li>
+        <li><b>2 of 3</b><span>hardware-wallet multisig holds the admin keys</span></li>
+        <li><b>Review</b><span><a href="/security-review/">published security review</a> (AI-assisted, not an independent audit)</span></li>
       </ul>
+      <a class="btn quiet small" href="#work">See the live work &darr;</a>
     </aside>
   </div>
 </div>
+
+<section id="work">
+  <div class="wrap">
+    <div class="head">
+      <h2>Live on-chain today</h2>
+      <p>Built solo, open source, and checkable by anyone.</p>
+    </div>
+    <h3 class="chain">BlockDAG (chain 1404)</h3>
+    <div class="work-grid">
+        <a class="work-card" href="https://reefdex.fyi"><b>Reef</b><small>Permissionless DEX: pools, swaps and a 24-hour price oracle</small><span>reefdex.fyi &rarr;</span></a>
+        <a class="work-card" href="https://nodaldex.fyi"><b>Nodal</b><small>Aggregator that routes each trade to the best source; router source verified</small><span>nodaldex.fyi &rarr;</span></a>
+        <a class="work-card" href="https://handshakeotc.fyi"><b>Handshake</b><small>OTC escrow: both sides settle in one transaction, or nothing moves</small><span>handshakeotc.fyi &rarr;</span></a>
+        <a class="work-card" href="https://reefdex.fyi/reef/"><b>$REEF</b><small>Reef&rsquo;s own token: fixed supply, presale with a refund fallback, airdrop and a 12-month liquidity lock</small><span>reefdex.fyi/reef &rarr;</span></a>
+        <a class="work-card" href="https://cookedmeme.fyi"><b>$COOKED</b><small>Fair-launch meme on a bonding curve: no owner, liquidity burned when it graduates</small><span>cookedmeme.fyi &rarr;</span></a>
+        <a class="work-card" href="https://www.nocapmeme.fyi"><b>NOCAP</b><small>Community token, ownership renounced, 99.99% of its liquidity time-locked</small><span>nocapmeme.fyi &rarr;</span></a>
+        <a class="work-card" href="https://reefdex.fyi/cards/"><b>COOKED &times; NOCAP Cards</b><small>150 stat-battle NFTs: every mint adds its full price to a Reef pool as burned liquidity, with a provably fair reveal and a free battle game</small><span>reefdex.fyi/cards &rarr;</span></a>
+    </div>
+    <h3 class="chain">Circle&rsquo;s Arc</h3>
+    <div class="work-grid">
+        <a class="work-card" href="https://chordotc.com"><b>Chord OTC</b><small>Private OTC desk on Arc mainnet: both legs settle in one USDC transaction; verified contract, owned by a Safe multisig</small><span>chordotc.com &rarr;</span></a>
+        <a class="work-card" href="https://chordotc.com/crescent/#activity"><b>Arc wallet view</b><small>Read-only view of any Arc address: balances, full transfer history, CSV export. Nothing connected or signed. Part of Crescent</small><span>chordotc.com/crescent &rarr;</span></a>
+        <a class="work-card" href="https://chordotc.com/crescent/"><b>Arc payment link</b><small>Payment link and QR code with a live paid check. Funds go straight to your address, never through a contract; the payer confirms in their own wallet. Part of Crescent</small><span>chordotc.com/crescent &rarr;</span></a>
+        <a class="work-card" href="riptide/"><b>Riptide</b><small>Live Arc price-gap monitor: compares Arc's Uniswap pools with Coinbase every minute and logs every gap after fees. Read-only, paper trading only</small><span>riptide &rarr;</span></a>
+        <a class="work-card" href="https://arc-mcp.benjiprojects1404.workers.dev/"><b>Arc MCP</b><small>Read-only MCP server for Arc: lets Claude and other AI assistants read balances, quote Uniswap, check Riptide alerts and make Crescent payment links. Connect at /mcp</small><span>arc-mcp.workers.dev &rarr;</span></a>
+    </div>
+
+  </div>
+</section>
 
 <section id="prices">
   <div class="wrap">
