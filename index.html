@@ -128,6 +128,16 @@
   .work-card small{color:var(--muted);font-size:14px;line-height:1.5;flex:1}
   .work-card span{color:var(--green);font-size:14px;font-weight:600;margin-top:4px}
   @media (max-width:880px){.work-grid{grid-template-columns:minmax(0,1fr)}}
+
+  /* case study + about */
+  .case{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+  .case li{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:18px}
+  .case li b{display:block;font-family:"Spectral",Georgia,serif;font-size:26px;font-weight:600;color:var(--gold);margin-bottom:6px}
+  .case li span{color:var(--ink2);font-size:15px;line-height:1.5}
+  .about{display:grid;grid-template-columns:64px minmax(0,1fr);gap:24px;align-items:start}
+  .about h2{font-size:clamp(26px,3vw,32px);margin-bottom:10px}
+  .about p{color:var(--ink2);margin:0;max-width:70ch}
+  @media (max-width:880px){.case{grid-template-columns:minmax(0,1fr)}.about{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:880px){
     .hero{grid-template-columns:minmax(0,1fr);gap:36px;padding:28px 0 52px}
     .steps{grid-template-columns:minmax(0,1fr)}
@@ -156,6 +166,7 @@
       <a href="#review">Code review</a>
       <a href="#process">How it works</a>
       <a href="#rules">Ground rules</a>
+      <a href="#faq">FAQ</a>
       <a href="#contact">Contact</a>
     </nav>
   </header>
@@ -208,6 +219,22 @@
         <a class="work-card" href="https://arc-mcp.benjiprojects1404.workers.dev/"><b>Arc MCP</b><small>Read-only MCP server for Arc: lets Claude and other AI assistants read balances, quote Uniswap, check Riptide alerts and make Crescent payment links. Connect at /mcp</small><span>arc-mcp.workers.dev &rarr;</span></a>
     </div>
 
+  </div>
+</section>
+
+<section id="case">
+  <div class="wrap">
+    <div class="head">
+      <h2>Example: launching REEF</h2>
+      <p>Reef&rsquo;s own token went through the same Full Launch steps I sell. Every figure here can be checked on chain.</p>
+    </div>
+    <ul class="case">
+      <li><b>21,000,000</b><span>fixed supply, minted once, with no owner and no mint function</span></li>
+      <li><b>Presale</b><span>7 Oct to 6 Nov 2026 at a fixed price, with a full refund if it didn&rsquo;t reach its target</span></li>
+      <li><b>12 months</b><span>every BDAG raised went into the REEF/BDAG pool, with the liquidity locked until 6 Nov 2027</span></li>
+      <li><b>20 wallets</b><span>received a 79,800 REEF airdrop from an on-chain snapshot, with the full list and the code published</span></li>
+    </ul>
+    <p class="note"><a href="https://reefdex.fyi/reef/">See the REEF launch page</a>, with every address, the vesting and the airdrop rules.</p>
   </div>
 </section>
 
@@ -339,6 +366,32 @@
   </div>
 </section>
 
+<section id="faq">
+  <div class="wrap">
+    <div class="head">
+      <h2>Questions</h2>
+    </div>
+    <div class="rules">
+      <div><h3>Which chains do you work on?</h3><p>Any EVM chain, including Ethereum, Base, BNB Chain, Arbitrum, Polygon, Circle&rsquo;s Arc and BlockDAG (chain 1404). Prices are the same on each; you pay the network fees.</p></div>
+      <div><h3>What if the presale doesn&rsquo;t fill?</h3><p>Every presale I build has a refund fallback: if it doesn&rsquo;t reach its target, buyers claim their money back from the contract.</p></div>
+      <div><h3>Can you get my contracts audited?</h3><p>Audits aren&rsquo;t included, but I prepare the audit pack (scope, tests and docs) and can point you to firms that work with small projects.</p></div>
+      <div><h3>What do I own at the end?</h3><p>Everything. The contracts are deployed from your wallets, the source lives in your own GitHub repository, and the site is yours to host.</p></div>
+      <div><h3>Can I just buy part of a package?</h3><p>Yes. Each package is a starting point; we write down exactly what you need, and the price follows that written scope.</p></div>
+      <div><h3>How fast do you reply?</h3><p>I&rsquo;m based in Thailand (UTC+7). Message me on Telegram or by email and I&rsquo;ll reply as soon as I can.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="wrap about">
+    <img src="undercurrent-mark.svg" alt="" width="64" height="64">
+    <div>
+      <h2>About me</h2>
+      <p>I&rsquo;m Benji. I spent my early career in private banking at HSBC in Jersey, where checking where money goes, and who controls it, was the job. I&rsquo;ve lived in Thailand for about 16 years, running businesses here, and have been in crypto for about 10. Undercurrent Works is the name I build under: Reef, Nodal, Handshake and Chord OTC are all mine, built solo and run in the open.</p>
+    </div>
+  </div>
+</section>
+
 <div class="wrap" id="contact" style="padding-top:8px">
   <div class="contact">
     <div>
@@ -352,6 +405,7 @@
       <dt>Fiverr</dt><dd><a href="https://www.fiverr.com/benji_projects/launch-your-token-with-locked-liquidity-on-any-evm-chain">Launch your token gig</a></dd>
       <dt>Upwork</dt><dd><a href="https://www.upwork.com/freelancers/~01a48da5478e45e2be">Benjamin S. on Upwork</a></dd>
       <dt>GitHub</dt><dd><a href="https://github.com/benjiprojects1404-maker">benjiprojects1404-maker</a></dd>
+      <dt>Based in</dt><dd>Thailand (UTC+7)</dd>
       <dt>Payment</dt><dd>USDT or USDC; Payoneer payment request on request</dd>
     </dl>
   </div>
