@@ -105,6 +105,22 @@
   .contact .btn.primary:hover{background:#3CC897}
   footer{padding:36px 0 48px;color:var(--muted);font-size:14px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px}
 
+
+  /* hero summary + live work grid */
+  .facts{list-style:none;margin:6px 0 18px;padding:0}
+  .facts li{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:baseline;padding:12px 0;border-top:1px solid var(--rule)}
+  .facts li b{font-family:"Spectral",Georgia,serif;font-size:22px;color:var(--gold);font-weight:600}
+  .facts li span{color:var(--ink2);font-size:15px;line-height:1.45}
+  .btn.small{padding:10px 16px;font-size:15px}
+  .ledger{padding-bottom:22px}
+  .chain{font-size:15px;font-family:"Public Sans",sans-serif;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);margin:8px 0 14px}
+  .work-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:30px}
+  .work-card{display:flex;flex-direction:column;gap:6px;background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:18px 18px 16px;text-decoration:none;color:var(--ink);transition:border-color .15s,transform .15s}
+  .work-card:hover{border-color:var(--green);transform:translateY(-2px)}
+  .work-card b{font-weight:600;font-size:17px}
+  .work-card small{color:var(--muted);font-size:14px;line-height:1.5;flex:1}
+  .work-card span{color:var(--green);font-size:14px;font-weight:600;margin-top:4px}
+  @media (max-width:880px){.work-grid{grid-template-columns:minmax(0,1fr)}}
   @media (max-width:880px){
     .hero{grid-template-columns:minmax(0,1fr);gap:36px;padding:28px 0 52px}
     .steps{grid-template-columns:minmax(0,1fr)}
@@ -128,6 +144,7 @@
   <header class="top">
     <a class="brand" href="/"><img src="undercurrent-mark.svg" alt="" width="28" height="28" style="vertical-align:-7px;margin-right:9px">Undercurrent <span>Works</span></a>
     <nav aria-label="Sections">
+      <a href="#work">Work</a>
       <a href="#prices">Prices</a>
       <a href="#review">Code review</a>
       <a href="#process">How it works</a>
@@ -147,25 +164,45 @@
     </div>
 
     <aside class="ledger" aria-labelledby="proof">
-      <h2 id="proof">Live on-chain today</h2>
-      <p class="sub">On Circle&rsquo;s Arc and BlockDAG (chain 1404). Built solo, open source, and checkable by anyone. <a href="/security-review/">Read the security review</a> (AI-assisted, not an independent audit).</p>
-      <ul>
-        <li><div><b>Reef</b><small>Permissionless DEX: pools, swaps and a 24-hour price oracle</small></div><a href="https://reefdex.fyi">reefdex.fyi</a></li>
-        <li><div><b>Nodal</b><small>Aggregator that routes each trade to the best source; router source verified</small></div><a href="https://nodaldex.fyi">nodaldex.fyi</a></li>
-        <li><div><b>Handshake</b><small>OTC escrow: both sides settle in one transaction, or nothing moves</small></div><a href="https://handshakeotc.fyi">handshakeotc.fyi</a></li>
-        <li><div><b>Chord OTC</b><small>Private OTC desk on Arc mainnet: both legs settle in one USDC transaction; verified contract, owned by a Safe multisig</small></div><a href="https://chordotc.com">chordotc.com</a></li>
-        <li><div><b>Arc wallet view</b><small>Read-only view of any Arc address: balances, full transfer history, CSV export. Nothing connected or signed. Part of Crescent</small></div><a href="https://chordotc.com/crescent/#activity">chordotc.com/crescent</a></li>
-        <li><div><b>Arc payment link</b><small>Payment link and QR code with a live paid check. Funds go straight to your address, never through a contract; the payer confirms in their own wallet. Part of Crescent</small></div><a href="https://chordotc.com/crescent/">chordotc.com/crescent</a></li>
-        <li><div><b>Riptide</b><small>Live Arc price-gap monitor: compares Arc's Uniswap pools with Coinbase every minute and logs every gap after fees. Read-only, paper trading only</small></div><a href="riptide/">riptide</a></li>
-        <li><div><b>Arc MCP</b><small>Read-only MCP server for Arc: lets Claude and other AI assistants read balances, quote Uniswap, check Riptide alerts and make Crescent payment links. Connect at /mcp</small></div><a href="https://arc-mcp.benjiprojects1404.workers.dev/">arc-mcp.workers.dev</a></li>
-        <li><div><b>$REEF</b><small>Reef&rsquo;s own token: fixed supply, presale with a refund fallback, airdrop and a 12-month liquidity lock</small></div><a href="https://reefdex.fyi/reef/">reefdex.fyi/reef</a></li>
-        <li><div><b>$COOKED</b><small>Fair-launch meme on a bonding curve: no owner, liquidity burned when it graduates</small></div><a href="https://cookedmeme.fyi">cookedmeme.fyi</a></li>
-        <li><div><b>NOCAP</b><small>Community token, ownership renounced, 99.99% of its liquidity time-locked</small></div><a href="https://www.nocapmeme.fyi">nocapmeme.fyi</a></li>
-        <li><div><b>COOKED &times; NOCAP Cards</b><small>150 stat-battle NFTs: every mint adds its full price to a Reef pool as burned liquidity, with a provably fair reveal and a free battle game</small></div><a href="https://reefdex.fyi/cards/">reefdex.fyi/cards</a></li>
+      <h2 id="proof">Built and running, not just pitched</h2>
+      <ul class="facts">
+        <li><b>12</b><span>live products on Circle&rsquo;s Arc and BlockDAG (chain 1404)</span></li>
+        <li><b>Open</b><span>source for every contract, checkable against the chain</span></li>
+        <li><b>2 of 3</b><span>hardware-wallet multisig holds the admin keys</span></li>
+        <li><b>Review</b><span><a href="/security-review/">published security review</a> (AI-assisted, not an independent audit)</span></li>
       </ul>
+      <a class="btn quiet small" href="#work">See the live work &darr;</a>
     </aside>
   </div>
 </div>
+
+<section id="work">
+  <div class="wrap">
+    <div class="head">
+      <h2>Live on-chain today</h2>
+      <p>Built solo, open source, and checkable by anyone.</p>
+    </div>
+    <h3 class="chain">BlockDAG (chain 1404)</h3>
+    <div class="work-grid">
+        <a class="work-card" href="https://reefdex.fyi"><b>Reef</b><small>Permissionless DEX: pools, swaps and a 24-hour price oracle</small><span>reefdex.fyi &rarr;</span></a>
+        <a class="work-card" href="https://nodaldex.fyi"><b>Nodal</b><small>Aggregator that routes each trade to the best source; router source verified</small><span>nodaldex.fyi &rarr;</span></a>
+        <a class="work-card" href="https://handshakeotc.fyi"><b>Handshake</b><small>OTC escrow: both sides settle in one transaction, or nothing moves</small><span>handshakeotc.fyi &rarr;</span></a>
+        <a class="work-card" href="https://reefdex.fyi/reef/"><b>$REEF</b><small>Reef&rsquo;s own token: fixed supply, presale with a refund fallback, airdrop and a 12-month liquidity lock</small><span>reefdex.fyi/reef &rarr;</span></a>
+        <a class="work-card" href="https://cookedmeme.fyi"><b>$COOKED</b><small>Fair-launch meme on a bonding curve: no owner, liquidity burned when it graduates</small><span>cookedmeme.fyi &rarr;</span></a>
+        <a class="work-card" href="https://www.nocapmeme.fyi"><b>NOCAP</b><small>Community token, ownership renounced, 99.99% of its liquidity time-locked</small><span>nocapmeme.fyi &rarr;</span></a>
+        <a class="work-card" href="https://reefdex.fyi/cards/"><b>COOKED &times; NOCAP Cards</b><small>150 stat-battle NFTs: every mint adds its full price to a Reef pool as burned liquidity, with a provably fair reveal and a free battle game</small><span>reefdex.fyi/cards &rarr;</span></a>
+    </div>
+    <h3 class="chain">Circle&rsquo;s Arc</h3>
+    <div class="work-grid">
+        <a class="work-card" href="https://chordotc.com"><b>Chord OTC</b><small>Private OTC desk on Arc mainnet: both legs settle in one USDC transaction; verified contract, owned by a Safe multisig</small><span>chordotc.com &rarr;</span></a>
+        <a class="work-card" href="https://chordotc.com/crescent/#activity"><b>Arc wallet view</b><small>Read-only view of any Arc address: balances, full transfer history, CSV export. Nothing connected or signed. Part of Crescent</small><span>chordotc.com/crescent &rarr;</span></a>
+        <a class="work-card" href="https://chordotc.com/crescent/"><b>Arc payment link</b><small>Payment link and QR code with a live paid check. Funds go straight to your address, never through a contract; the payer confirms in their own wallet. Part of Crescent</small><span>chordotc.com/crescent &rarr;</span></a>
+        <a class="work-card" href="riptide/"><b>Riptide</b><small>Live Arc price-gap monitor: compares Arc's Uniswap pools with Coinbase every minute and logs every gap after fees. Read-only, paper trading only</small><span>riptide &rarr;</span></a>
+        <a class="work-card" href="https://arc-mcp.benjiprojects1404.workers.dev/"><b>Arc MCP</b><small>Read-only MCP server for Arc: lets Claude and other AI assistants read balances, quote Uniswap, check Riptide alerts and make Crescent payment links. Connect at /mcp</small><span>arc-mcp.workers.dev &rarr;</span></a>
+    </div>
+
+  </div>
+</section>
 
 <section id="prices">
   <div class="wrap">
