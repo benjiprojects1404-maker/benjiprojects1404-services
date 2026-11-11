@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://benjiprojects1404-services.pages.dev/sitemap.xml
