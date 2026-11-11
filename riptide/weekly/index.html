@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Riptide weekly · Arc markets this week</title>
+<meta name="description" content="A weekly summary of Arc's markets from Riptide: price gaps against Binance and Coinbase after real costs, liquidity pulls and Faze launches. Paper trading only.">
+<link rel="icon" href="../mark.svg" type="image/svg+xml">
+<meta name="theme-color" content="#090a0a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Same black-and-gold palette as Chord OTC and Crescent. */
+:root{
+  color-scheme:dark;
+  --paper:#090a0a; --sheet:#111312; --sheet-2:#171a19; --ink:#ece8de; --muted:#a29d90; --rule:#232624; --rule-2:#2f3331;
+  --gold:#d9b45a; --gold-2:#ecd08a; --gold-ink:#1b1406; --gold-soft:rgba(217,180,90,.11);
+  --metal:linear-gradient(135deg,#f3dc9a 0%,#d9b45a 38%,#b48a35 62%,#e6c97d 100%);
+  --green:#57c094; --green-tint:rgba(87,192,148,.13); --red:#e07a6a; --red-tint:rgba(224,122,106,.12);
+  --l1:#e3c06a; --l2:#6aa8e0; --l3:#ee8a5c; --l4:#c48ae6; --l5:#57c094;
+  --grid:#232624; --serif:"Cormorant Garamond",Georgia,serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+*{box-sizing:border-box}
+html{background:var(--paper)}
+body{margin:0;min-height:100vh;color:var(--ink);font:14.5px/1.6 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(ellipse at 15% -10%,rgba(217,180,90,.10) 0%,rgba(9,10,10,0) 55%),var(--paper)}
+h1,h2,h3{font-family:var(--serif);font-weight:600;line-height:1.1;margin:0}
+a{color:var(--gold)}
+header{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--rule);background:rgba(9,10,10,.6)}
+.brand{display:flex;align-items:center;gap:10px;font:700 24px/1 var(--serif);color:var(--ink);text-decoration:none;letter-spacing:.3px}
+.brand img{width:30px;height:30px}
+.back{font-size:13px;color:var(--muted);text-decoration:none;white-space:nowrap} .back:hover{color:var(--gold-2)}
+.spacer{flex:1}
+.pill{font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--rule-2);color:var(--muted);white-space:nowrap}
+.pill.live{border-color:rgba(87,192,148,.4);background:var(--green-tint);color:var(--green)}
+main{max-width:980px;margin:0 auto;padding:28px 16px 40px}
+h1{font-size:52px;background:var(--metal);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block}
+.lede{color:var(--muted);max-width:680px;margin:10px 0 22px}
+.card{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:20px;margin-bottom:18px}
+.card h2{font-size:30px;margin-bottom:4px;color:var(--gold-2)} .sub{color:var(--muted);font-size:13.5px;margin:0 0 14px}
+.notice{border-left:3px solid var(--gold);background:var(--gold-soft);padding:10px 14px;border-radius:6px;font-size:14px;margin-bottom:18px}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:8px 8px;border-bottom:1px solid var(--rule);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:12.5px}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.pos{color:var(--green);font-weight:600} .neg{color:var(--red)}
+.yes{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--green-tint);color:var(--green);font-size:12px;font-weight:600}
+.no{color:var(--muted);font-size:12px}
+.warn{display:inline-block;padding:1px 8px;border-radius:999px;background:var(--red-tint);color:var(--red);font-size:12px;font-weight:600}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.seg button{border:1px solid var(--rule);background:var(--sheet);padding:6px 12px;font:inherit;font-size:13px;cursor:pointer;color:var(--ink)}
+.seg button:first-child{border-radius:8px 0 0 8px} .seg button:last-child{border-radius:0 8px 8px 0} .seg button+button{border-left:none}
+.seg button[aria-pressed="true"]{background:var(--metal);color:var(--gold-ink);border-color:var(--gold);font-weight:600}
+.seg button:hover{border-color:var(--gold)}
+.seg{display:inline-flex}
+#chart{width:100%;height:300px;display:block}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;margin-top:8px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.stat{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:14px 16px}
+.stat b{display:block;font-family:var(--serif);font-size:32px;color:var(--gold-2);font-weight:600;line-height:1.1}
+.stat span{color:var(--muted);font-size:12.5px}
+ul.plain{margin:0;padding-left:18px} ul.plain li{margin:4px 0}
+.mono{font-family:var(--mono);font-size:12.5px}
+.btn{display:inline-block;border:1px solid var(--rule);background:var(--sheet);border-radius:8px;padding:7px 12px;font-size:13px;text-decoration:none;color:var(--ink)}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+footer{max-width:980px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font-size:12.5px}
+@media (max-width:700px){ h1{font-size:40px} .back{display:none} header{padding:12px 16px} .stats{grid-template-columns:repeat(2,1fr)} }
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.stat{background:var(--sheet);border:1px solid var(--rule);border-radius:12px;padding:16px}
+.stat b{display:block;font:600 34px/1.1 var(--serif);color:var(--gold-2)}
+.stat span{color:var(--muted);font-size:13px}
+.post{width:100%;min-height:210px;background:var(--sheet-2);color:var(--ink);border:1px solid var(--rule-2);border-radius:10px;padding:12px;font:13.5px/1.55 var(--mono);resize:vertical}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.btn{border:1px solid var(--gold);background:var(--metal);color:var(--gold-ink);font:600 14px Inter,sans-serif;padding:8px 16px;border-radius:8px;cursor:pointer}
+.count{color:var(--muted);font-size:13px}
+ul.plain{margin:0;padding-left:18px} ul.plain li{margin:4px 0}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))} h1{font-size:40px}}
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="../"><img src="../mark.svg" alt="">Riptide</a>
+  <span class="spacer"></span>
+  <a class="back" href="../">&larr; Live dashboard</a>
+</header>
+<main>
+  <h1>This week on Arc</h1>
+  <p class="lede" id="range">Loading the last 7 days&hellip;</p>
+  <div class="notice">Paper trading only. Riptide reads public prices every minute and never trades, holds funds or uses a wallet.</div>
+
+  <div class="stats">
+    <div class="stat"><b id="sChecks">&ndash;</b><span>price checks</span></div>
+    <div class="stat"><b id="sHits">&ndash;</b><span>gaps worth taking after fees</span></div>
+    <div class="stat"><b id="sAlerts">&ndash;</b><span>liquidity or price alarms</span></div>
+    <div class="stat"><b id="sLaunch">&ndash;</b><span>Faze launches</span></div>
+  </div>
+
+  <section class="card">
+    <h2>Price gaps</h2>
+    <p class="sub">Each pair at $10 and $1,000, every minute. A gap is &ldquo;worth taking&rdquo; when it beats the exchange fee and Arc gas.</p>
+    <div class="tablewrap"><table><thead><tr><th>Pair</th><th class="n">Size</th><th class="n">Checks</th><th class="n">Worth taking</th><th class="n">Best gap after costs</th><th class="n">Paper P&amp;L</th></tr></thead><tbody id="gaps"></tbody></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Alarms</h2>
+    <p class="sub">Sudden drops in a watched pool&rsquo;s liquidity or price: the usual sign of liquidity being pulled.</p>
+    <div id="alarms" class="count">Loading&hellip;</div>
+  </section>
+
+  <section class="card">
+    <h2>Faze launchpad</h2>
+    <p class="sub">New memecoin launches and graduations into locked pools on Faze, Arc&rsquo;s launchpad.</p>
+    <div id="faze" class="count">Loading&hellip;</div>
+  </section>
+
+  <section class="card">
+    <h2>Post for X</h2>
+    <p class="sub">Written from this week&rsquo;s numbers. Edit if you like, then copy.</p>
+    <textarea class="post" id="post" spellcheck="true"></textarea>
+    <div class="row"><button class="btn" id="copy" type="button">Copy post</button><span class="count" id="len"></span></div>
+  </section>
+</main>
+<script>
+const API = (new URLSearchParams(location.search).get("api") || "https://riptide.benjiprojects1404.workers.dev").replace(/\/$/, "");
+const $ = id => document.getElementById(id);
+const fmtN = n => Number(n).toLocaleString("en-GB");
+const pct = x => (x * 100).toFixed(2) + "%";
+const day = ts => new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+async function get(p) { const r = await fetch(API + p); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
+
+(async () => {
+  try {
+    const [sum, ev, fz] = await Promise.all([get("/api/summary?days=7"), get("/api/events?days=7"), get("/api/faze?days=7")]);
+    const now = Math.floor(Date.now() / 1000), from = Math.max(sum.since || now - 7 * 86400, now - 7 * 86400);
+    $("range").textContent = `${day(from)} to ${day(now)} (UTC). Arc's Uniswap pools against Binance and Coinbase, plus liquidity alarms and Faze launches.`;
+    const rows = sum.rows || [];
+    const checks = rows.reduce((a, r) => a + r.n, 0), hits = rows.reduce((a, r) => a + r.hits, 0), pnl = rows.reduce((a, r) => a + (r.paper_pnl || 0), 0);
+    $("sChecks").textContent = fmtN(checks); $("sHits").textContent = fmtN(hits);
+    $("gaps").innerHTML = rows.map(r => `<tr><td>${esc(r.pair)}</td><td class="n">$${fmtN(r.size)}</td><td class="n">${fmtN(r.n)}</td><td class="n">${r.hits ? `<span class="yes">${fmtN(r.hits)}</span>` : '<span class="no">0</span>'}</td><td class="n ${r.best_net > 0 ? "pos" : "neg"}">${pct(r.best_net)}</td><td class="n">${r.paper_pnl ? "$" + r.paper_pnl.toFixed(2) : "&ndash;"}</td></tr>`).join("");
+
+    const alarms = (ev.rows || []).filter(e => e.ts >= from);
+    $("sAlerts").textContent = fmtN(alarms.length);
+    const byPair = {};
+    for (const e of alarms) (byPair[e.pair] = byPair[e.pair] || []).push(e);
+    $("alarms").innerHTML = alarms.length ? "<ul class='plain'>" + Object.entries(byPair).map(([p, l]) => {
+      const liq = l.filter(e => e.kind === "liquidity_drop"), pr = l.filter(e => e.kind === "price_drop");
+      const parts = [];
+      if (liq.length) parts.push(`liquidity pulled ${liq.length} time${liq.length > 1 ? "s" : ""} (${liq.sort((a, b) => a.ts - b.ts).map(e => Math.round(e.change * 100) + "%").join(", ")})`);
+      if (pr.length) parts.push(`${pr.length} sharp price drop${pr.length > 1 ? "s" : ""} (largest ${Math.round(Math.min(...pr.map(e => e.change)) * 100)}%)`);
+      return `<li><b>${esc(p)}</b>: ${parts.join("; ")}</li>`;
+    }).join("") + "</ul>" : "No alarms this week.";
+
+    const fev = (fz.events || []).filter(e => e.ts >= from);
+    const launches = fev.filter(e => e.kind === "launch"), grads = fev.filter(e => e.kind !== "launch");
+    $("sLaunch").textContent = fmtN(launches.length);
+    $("faze").innerHTML = (fev.length ? "<ul class='plain'>" + fev.map(e => `<li>${day(e.ts)}: ${e.kind === "launch" ? "launched" : "graduated"} <b>${esc(e.name || e.symbol || e.token)}</b>${e.symbol ? " (" + esc(e.symbol) + ")" : ""}</li>`).join("") + "</ul>" : "No launches or graduations this week.")
+      + ((fz.watched || []).length ? "<p class='sub' style='margin-top:12px'>Watched tokens, last 24 hours: " + fz.watched.map(w => `${esc(w.pair)} ${w.price24h ? ((w.price / w.price24h - 1) * 100).toFixed(1) + "%" : "&ndash;"}`).join(" &middot; ") + "</p>" : "");
+
+    // X post
+    const hitPairs = rows.filter(r => r.hits).reduce((m, r) => (m[r.pair] = (m[r.pair] || 0) + r.hits, m), {});
+    const hitTxt = Object.keys(hitPairs).length ? ` (${Object.entries(hitPairs).sort((a, b) => b[1] - a[1]).map(([p, n]) => `${p} ${n}`).join(", ")})` : "";
+    const lines = [`Riptide weekly: Arc markets, ${day(from)} to ${day(now)}`, "",
+      `${fmtN(checks)} price checks of Arc's pools against Binance and Coinbase`,
+      `Gaps worth taking after fees: ${fmtN(hits)}${hitTxt}`];
+    for (const [p, l] of Object.entries(byPair)) {
+      const liq = l.filter(e => e.kind === "liquidity_drop");
+      if (liq.length) lines.push(`Rug alarm: ${p} pool liquidity pulled ${liq.length}x (${liq.map(e => Math.round(e.change * 100) + "%").join(", ")})`);
+    }
+    lines.push(`Faze: ${launches.length} launch${launches.length === 1 ? "" : "es"}, ${grads.length} graduation${grads.length === 1 ? "" : "s"}`);
+    lines.push("", "Paper trading only: it never trades.", "benjiprojects1404-services.pages.dev/riptide/weekly/");
+    $("post").value = lines.join("\n");
+    const upd = () => { const n = [...$("post").value].length; $("len").textContent = n + " characters" + (n > 280 ? " (over 280: fine on Premium, trim for a standard account)" : ""); };
+    $("post").oninput = upd; upd();
+  } catch (e) {
+    $("range").textContent = "Couldn't load Riptide's data just now (" + e.message + "). Try again in a minute.";
+  }
+})();
+$("copy").onclick = async () => { try { await navigator.clipboard.writeText($("post").value); $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy post", 1500); } catch (e) { $("post").select(); } };
+</script>
+</body>
+</html>
