@@ -46,14 +46,21 @@ const toUnits = (s, dec) => {
 };
 const fromUnits = (v, dec) => { const s = BigInt(v).toString().padStart(dec + 1, "0"); const i = s.slice(0, -dec) || "0", f = s.slice(-dec).replace(/0+$/, ""); return dec ? (f ? `${i}.${f}` : i) : s; };
 
+// Arc's public endpoints (docs.arc.io "RPC endpoints"), no key needed. They're tried first, starting on a different
+// one each time, and ARC_RPC_URL (a private key, e.g. Alchemy) is only the last resort, so its monthly plan lasts.
+const PUBLIC_RPCS = [["public arc.io", ARC_RPC], ["public dRPC", "https://rpc.drpc.mainnet.arc.io"],
+  ["public QuickNode", "https://rpc.quicknode.mainnet.arc.io"], ["public Blockdaemon", "https://rpc.blockdaemon.mainnet.arc.io"]];
+let rpcTurn = 0;
 async function rpc(env, method, params) {
   // Labels only — never include the URL itself, since ARC_RPC_URL may embed an API key.
-  const endpoints = [["custom ARC_RPC_URL", env.ARC_RPC_URL], ["public ARC_RPC", ARC_RPC]].filter(([, url]) => url);
+  const k = rpcTurn++ % PUBLIC_RPCS.length;
+  const pub = [...PUBLIC_RPCS.slice(k), ...PUBLIC_RPCS.slice(0, k)];
+  const endpoints = (env.ARC_RPC_URL && env.PRIVATE_RPC_FIRST === "1" ? [["custom ARC_RPC_URL", env.ARC_RPC_URL], ...pub] : [...pub, ["custom ARC_RPC_URL", env.ARC_RPC_URL]]).filter(([, url]) => url);
   const failures = [];
   for (const [label, url] of endpoints) {
     let last;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt) await new Promise(r => setTimeout(r, 800 * attempt));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, 600));
       try {
         const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
         if (!r.ok) { last = `HTTP ${r.status} ${r.statusText}`.trim(); continue; }
