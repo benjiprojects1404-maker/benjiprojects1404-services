@@ -176,7 +176,7 @@ const TOOLS = [
   },
   {
     name: "riptide_rug_alarms",
-    description: "Rug-alarm events from Riptide: sudden price drops (20%+) or liquidity pulled (50%+) between two one-minute checks, on the Arc pools it watches.",
+    description: "Rug-alarm events from Riptide: sudden price drops (20%+) or liquidity pulled (50%+) between two checks five minutes apart, on the Arc pools it watches.",
     inputSchema: { type: "object", properties: { days: { type: "integer", minimum: 1, maximum: 30, description: "Look-back in days (default 7)" } } },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ days = 7 }, env) {
