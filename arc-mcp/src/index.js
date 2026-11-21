@@ -20,7 +20,7 @@ const SEL = { nextOfferId: "0x5f5d0655", getOffer: "0x4579268a", offerReady: "0x
   createUsdc: "0xdc94e565", createToken: "0x6332c991", fill: "0x85dba861", cancel: "0xef706adf", approve: "0x095ea7b3",
   allowance: "0xdd62ed3e", balanceOf: "0x70a08231", symbol: "0x95d89b41", decimals: "0x313ce567", maxOfferAmount: "0x8848bfa6" };
 
-// The eight tokens listed on Chord OTC, matched by address (Arc has look-alike tokens with the same names).
+// The ten tokens listed on Chord OTC, matched by address (Arc has look-alike tokens with the same names).
 const TOKENS = {
   USDC:    { addr: USDC, dec: 6 },
   EURC:    { addr: "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1", dec: 6,  v3Fee: 500 },
@@ -30,6 +30,8 @@ const TOKENS = {
   VIRTUAL: { addr: "0x8c4252c87081c88c6ad57d6dd97e1cafebf842b7", dec: 18 },
   ARGUS:   { addr: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18, v3Fee: 10000 },
   ARCUS:   { addr: "0xb7c934ff18730c24e6113bb4bc5a68feef16fd29", dec: 18 },
+  GBPA:    { addr: "0xbbe6aab0ed76e90aea0d1cd978ec231c8adcdf8b", dec: 6 },
+  MXNB:    { addr: "0xf197ffc28c23e0309b5559e7a166f2c6164c80aa", dec: 6 },
 };
 const QUOTABLE = Object.keys(TOKENS).filter(k => TOKENS[k].v3Fee);
 
