@@ -1,0 +1,7 @@
+{
+  "name": "cadence-arc-mcp",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test test/*.test.js" },
+  "dependencies": { "ethers": "6.13.4" }
+}
