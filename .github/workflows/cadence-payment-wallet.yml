@@ -1,0 +1,50 @@
+# One-off: creates Cadence's receive-only payment wallet and stores its key straight into the Worker's
+# SELLER_PRIVATE_KEY secret on Cloudflare. The key is generated here, masked, never printed, never stored in
+# GitHub, and nobody ever sees it. Only the wallet's public address is shown, at the end of the run.
+# The Worker uses the key only to sign Circle's "seller proof" and to sweep income to the Chord Treasury Safe.
+# Refuses to run if the secret already exists, so it can't replace a wallet that may hold income.
+name: Cadence payment wallet (one-off)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: arc-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm i -g wrangler@3
+      - name: Refuse if a key is already set
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if wrangler secret list --name arc-mcp | grep -q '"SELLER_PRIVATE_KEY"'; then
+            echo "::error::SELLER_PRIVATE_KEY already exists on arc-mcp. Not replacing it (it may hold income). Check https://arc-mcp.benjiprojects1404.workers.dev/ for the address."
+            exit 1
+          fi
+      - name: Create the wallet and store the key in Cloudflare
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set +x
+          KEY=$(node -e 'process.stdout.write("0x"+require("crypto").randomBytes(32).toString("hex"))')
+          echo "::add-mask::$KEY"
+          ADDR=$(KEY="$KEY" node --input-type=module -e 'import {Wallet} from "ethers"; process.stdout.write(new Wallet(process.env.KEY).address)')
+          printf '%s' "$KEY" | wrangler secret put SELLER_PRIVATE_KEY --name arc-mcp > /dev/null
+          unset KEY
+          echo "### Cadence payment wallet created" >> "$GITHUB_STEP_SUMMARY"
+          echo "Receive address (public): \`$ADDR\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Income is swept weekly to the Chord Treasury Safe 0xc3FC2A5D1E7e2F5d597bE891e4BC36F117D9d4B6." >> "$GITHUB_STEP_SUMMARY"
+          echo "Receive address: $ADDR"

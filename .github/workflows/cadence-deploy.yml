@@ -1,0 +1,49 @@
+# Deploys Cadence (the arc-mcp Worker) to Cloudflare whenever arc-mcp/ changes on main, or by hand from the Actions tab.
+# Runs the tests first. Needs two repository secrets (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN   a token from Cloudflare's "Edit Cloudflare Workers" template
+#   CLOUDFLARE_ACCOUNT_ID  your Cloudflare account ID
+# Secrets set on the Worker in Cloudflare (ARC_RPC_URL, SELLER_PRIVATE_KEY, CIRCLE_API_KEY) are kept.
+name: Deploy Cadence
+
+on:
+  push:
+    branches: [main]
+    paths: ["arc-mcp/**", ".github/workflows/cadence-deploy.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cadence
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: arc-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm test
+      - name: Check secrets are set
+        id: check
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"
+          else echo "::notice::Cloudflare secrets not set; tests ran, deploy skipped."; fi
+      - name: Deploy
+        if: steps.check.outputs.ok == '1'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: arc-mcp
+          command: deploy

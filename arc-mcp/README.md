@@ -12,7 +12,7 @@ Chord OTC transaction that the user reviews and signs in their own wallet.
 
 | Tool | What it does |
 |---|---|
-| `arc_balances` | Balances of the eight Chord-listed tokens for any Arc address |
+| `arc_balances` | Balances of the ten Chord-listed tokens for any Arc address |
 | `arc_quote` | Real Uniswap v3 quote (buy or sell) for cirBTC, EURC, WETH or ARGUS, incl. pool fee and slippage |
 | `riptide_latest` | Riptide's latest price-gap check (Arc vs Coinbase, ARGUS v3 vs v4) after fees |
 | `riptide_rug_alarms` | Riptide's rug-alarm events (sudden price drops, liquidity pulled) |
@@ -23,12 +23,44 @@ Chord OTC transaction that the user reviews and signs in their own wallet.
 | `chord_prepare` | Unsigned transactions to create, fill or cancel an offer (approval first when needed), with a plain-English summary. Checks balance, approval, caps, private taker and pause first |
 | `chord_token_check` | The same code check Chord's site runs on unlisted tokens: upgradeable, mint/pause/block/tax powers, live transfer tax |
 
+## Pro tools (paid per call with x402)
+
+| Tool | Price | What it does |
+|---|---|---|
+| `pro_wallet_report` | $0.005 | Every ERC-20 an address holds (with the explorer's USD estimate and scam flags), wallet or contract (e.g. a Safe), creator, its 20 latest token transfers with counterparties, and its open Chord OTC offers |
+| `pro_token_report` | $0.005 | The `chord_token_check` code check plus holders count, supply, 24h volume, top 10 holders by type (burn, pool, contract, wallet), concentration outside burns and pools, and Riptide rug alarms in the last 30 days |
+
+The agent pays in USDC on Arc with [x402](https://x402.org) v2, scheme `exact` (an EIP-3009 authorization it signs),
+network `eip155:5042`, settled by [Circle's Facilitator Service](https://developers.circle.com/facilitator-service),
+which broadcasts the transfer and pays the gas.
+
+- **Over MCP:** call the tool; the result is `isError: true` with the `PaymentRequired` object in `structuredContent`.
+  Retry with the signed payment in `params._meta["x402/payment"]`. The settlement comes back in
+  `result._meta["x402/payment-response"]` ([x402 MCP transport](https://github.com/coinbase/x402/blob/main/specs/transports-v2/mcp.md)).
+- **Over plain HTTP:** `GET` or `POST /x402/<tool>` (arguments as query or JSON body). The first answer is `402` with a
+  `PAYMENT-REQUIRED` header; retry with `PAYMENT-SIGNATURE`; the `200` carries `PAYMENT-RESPONSE`. Works with standard
+  x402 clients.
+- **Never charged for nothing:** the payment is checked (amount, payee, expiry, signature, the payer's USDC balance)
+  before any work; the report is built before settling, so a failed report charges nothing; and the report is only
+  released once Circle confirms the transfer.
+
+**Where the money goes.** Circle's facilitator needs every request signed by the wallet being paid (a "seller proof"),
+so payments go to a receive-only wallet whose key is the Worker secret `SELLER_PRIVATE_KEY`. The key is created by the
+one-off GitHub Action *Cadence payment wallet*, straight into Cloudflare: nobody ever sees it. Each Monday the Worker
+sweeps that wallet's USDC (when there's at least 1 USDC) to the Chord Treasury Safe `0xc3FC…d4B6`, the only place it
+can send to. Anyone can trigger a sweep early with `POST /sweep`. Optional: a Circle API key as `CIRCLE_API_KEY` is
+sent alongside the proof (needed once Circle's keyless allowance runs out).
+
+Tests: `npm test` (17 tests: price signals, payment checks, seller proof, settlement success/pending/failure, plain HTTP
+x402), with every outside service mocked.
+
 ## Deploy (Cloudflare Workers, free tier)
 
-From this folder (`arc-mcp`):
+Automatic: the GitHub Action *Deploy Cadence* tests and deploys on every change to `arc-mcp/` on main (needs the
+repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`). By hand, from this folder:
 
 ```bash
-npx wrangler deploy
+npm ci && npx wrangler deploy
 ```
 
 It prints the address, e.g. `https://arc-mcp.<your-subdomain>.workers.dev`. The MCP endpoint is that address + `/mcp`.

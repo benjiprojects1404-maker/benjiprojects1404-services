@@ -1,6 +1,12 @@
 name = "arc-mcp"
 main = "src/index.js"
 compatibility_date = "2026-10-01"
+# Keep vars/secrets set in the Cloudflare dashboard (ARC_RPC_URL, SELLER_PRIVATE_KEY, CIRCLE_API_KEY) across deploys.
+keep_vars = true
+
+# Weekly sweep of Pro income to the Chord Treasury Safe (Mondays 03:17 UTC).
+[triggers]
+crons = ["17 3 * * 1"]
 
 # Worker-to-Worker calls on the same account must use a service binding;
 # fetching riptide's *.workers.dev URL directly fails with Cloudflare error 1042.
