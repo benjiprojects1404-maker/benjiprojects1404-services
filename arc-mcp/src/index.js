@@ -5,8 +5,13 @@
 // Chord OTC transaction for the user to review and sign in their own wallet.
 //
 // Transport: MCP "Streamable HTTP" in its simplest stateless form. Clients POST JSON-RPC to /mcp and get JSON back.
+//
+// Public name: Cadence (https://chordotc.com/cadence/). The ten tools below are free. The Pro tools further down
+// cost a fraction of a cent each, paid by the agent in USDC on Arc through x402 (see x402.js).
 
-const SERVER = { name: "arc-mcp", version: "0.2.0" };
+import { requirements, paymentRequired, checkPayment, settle, seller, sweep, NETWORK } from "./x402.js";
+
+const SERVER = { name: "cadence", title: "Cadence (Arc MCP)", version: "0.3.0" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const ARC_RPC = "https://rpc.mainnet.arc.io";
 const EXPLORER = "https://explorer.arc.io";
@@ -20,7 +25,7 @@ const SEL = { nextOfferId: "0x5f5d0655", getOffer: "0x4579268a", offerReady: "0x
   createUsdc: "0xdc94e565", createToken: "0x6332c991", fill: "0x85dba861", cancel: "0xef706adf", approve: "0x095ea7b3",
   allowance: "0xdd62ed3e", balanceOf: "0x70a08231", symbol: "0x95d89b41", decimals: "0x313ce567", maxOfferAmount: "0x8848bfa6" };
 
-// The eight tokens listed on Chord OTC, matched by address (Arc has look-alike tokens with the same names).
+// The ten tokens listed on Chord OTC, matched by address (Arc has look-alike tokens with the same names).
 const TOKENS = {
   USDC:    { addr: USDC, dec: 6 },
   EURC:    { addr: "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1", dec: 6,  v3Fee: 500 },
@@ -30,6 +35,8 @@ const TOKENS = {
   VIRTUAL: { addr: "0x8c4252c87081c88c6ad57d6dd97e1cafebf842b7", dec: 18 },
   ARGUS:   { addr: "0xece5ca8bf9220718e5727754026757512212cb3c", dec: 18, v3Fee: 10000 },
   ARCUS:   { addr: "0xb7c934ff18730c24e6113bb4bc5a68feef16fd29", dec: 18 },
+  GBPA:    { addr: "0xbbe6aab0ed76e90aea0d1cd978ec231c8adcdf8b", dec: 6 },
+  MXNB:    { addr: "0xf197ffc28c23e0309b5559e7a166f2c6164c80aa", dec: 6 },
 };
 const QUOTABLE = Object.keys(TOKENS).filter(k => TOKENS[k].v3Fee);
 
@@ -46,14 +53,21 @@ const toUnits = (s, dec) => {
 };
 const fromUnits = (v, dec) => { const s = BigInt(v).toString().padStart(dec + 1, "0"); const i = s.slice(0, -dec) || "0", f = s.slice(-dec).replace(/0+$/, ""); return dec ? (f ? `${i}.${f}` : i) : s; };
 
+// Arc's public endpoints (docs.arc.io "RPC endpoints"), no key needed. They're tried first, starting on a different
+// one each time, and ARC_RPC_URL (a private key, e.g. Alchemy) is only the last resort, so its monthly plan lasts.
+const PUBLIC_RPCS = [["public arc.io", ARC_RPC], ["public dRPC", "https://rpc.drpc.mainnet.arc.io"],
+  ["public QuickNode", "https://rpc.quicknode.mainnet.arc.io"], ["public Blockdaemon", "https://rpc.blockdaemon.mainnet.arc.io"]];
+let rpcTurn = 0;
 async function rpc(env, method, params) {
   // Labels only — never include the URL itself, since ARC_RPC_URL may embed an API key.
-  const endpoints = [["custom ARC_RPC_URL", env.ARC_RPC_URL], ["public ARC_RPC", ARC_RPC]].filter(([, url]) => url);
+  const k = rpcTurn++ % PUBLIC_RPCS.length;
+  const pub = [...PUBLIC_RPCS.slice(k), ...PUBLIC_RPCS.slice(0, k)];
+  const endpoints = (env.ARC_RPC_URL && env.PRIVATE_RPC_FIRST === "1" ? [["custom ARC_RPC_URL", env.ARC_RPC_URL], ...pub] : [...pub, ["custom ARC_RPC_URL", env.ARC_RPC_URL]]).filter(([, url]) => url);
   const failures = [];
   for (const [label, url] of endpoints) {
     let last;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      if (attempt) await new Promise(r => setTimeout(r, 800 * attempt));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      if (attempt) await new Promise(r => setTimeout(r, 600));
       try {
         const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
         if (!r.ok) { last = `HTTP ${r.status} ${r.statusText}`.trim(); continue; }
@@ -125,7 +139,7 @@ async function riptide(env, path) {
 const TOOLS = [
   {
     name: "arc_balances",
-    description: "Balances of the eight Chord-listed tokens (USDC, EURC, WETH, cirBTC, LINK, VIRTUAL, ARGUS, ARCUS) for any Arc mainnet address. Read-only.",
+    description: "Balances of the ten Chord-listed tokens (USDC, EURC, GBPA, MXNB, WETH, cirBTC, LINK, VIRTUAL, ARGUS, ARCUS) for any Arc mainnet address. Read-only.",
     inputSchema: { type: "object", properties: { address: { type: "string", description: "Arc address, 0x… (40 hex chars)" } }, required: ["address"] },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ address }, env) {
@@ -176,7 +190,7 @@ const TOOLS = [
   },
   {
     name: "riptide_rug_alarms",
-    description: "Rug-alarm events from Riptide: sudden price drops (20%+) or liquidity pulled (50%+) between two one-minute checks, on the Arc pools it watches.",
+    description: "Rug-alarm events from Riptide: sudden price drops (20%+) or liquidity pulled (50%+) between two checks five minutes apart, on the Arc pools it watches.",
     inputSchema: { type: "object", properties: { days: { type: "integer", minimum: 1, maximum: 30, description: "Look-back in days (default 7)" } } },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ days = 7 }, env) {
@@ -367,26 +381,134 @@ const TOOLS = [
   },
 ];
 
+// ---------- Pro tools (paid per call with x402) ----------
+// Heavier reports built from Arc's explorer plus on-chain reads. Prices are in USDC base units (6 decimals).
+async function explorer(path) {
+  const r = await fetch(EXPLORER + "/api/v2" + path, { headers: { accept: "application/json" } });
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error(`Arc explorer ${path.split("?")[0]} failed: HTTP ${r.status}`);
+  return r.json();
+}
+const usd = (amount, rate) => rate == null || amount == null ? null : +(Number(amount) * Number(rate)).toFixed(2);
+const label = a => a ? (a.name || a.implementations?.[0]?.name || (/^0x0{36}dead$/i.test(a.hash) || /^0x0{40}$/.test(a.hash) ? "burn address" : null)) : null;
+
+const PRO_TOOLS = [
+  {
+    name: "pro_wallet_report",
+    price: 5000n, // $0.005
+    description: "PRO ($0.005 per call, paid in USDC on Arc via x402). Full report on any Arc address: every ERC-20 it holds (not just Chord's list) with the explorer's USD estimate and scam flags, whether it's a wallet or a contract (and which kind, e.g. a Safe), when it was created, its 20 latest token transfers in and out with counterparties, and any open Chord OTC offers it made. Read-only.",
+    inputSchema: { type: "object", properties: { address: { type: "string", description: "Arc address, 0x…" } }, required: ["address"] },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    async run({ address }, env) {
+      if (!isAddr(address)) throw new Error("address must be a 0x address");
+      const a = address.toLowerCase();
+      const [info, toks, xfers] = await Promise.all([explorer(`/addresses/${a}`), explorer(`/addresses/${a}/tokens?type=ERC-20`), explorer(`/addresses/${a}/token-transfers?type=ERC-20`)]);
+      const holdings = (toks?.items || []).map(i => {
+        const dec = Number(i.token?.decimals ?? 18), amt = fromUnits(BigInt(i.value || 0), dec), addr = i.token?.address_hash?.toLowerCase();
+        return { symbol: i.token?.symbol, name: i.token?.name, address: addr, amount: amt, usd_estimate: usd(amt, i.token?.exchange_rate),
+          listed_on_chord: !!BY_ADDR[addr], reputation: i.token?.reputation || null };
+      }).sort((x, y) => (y.usd_estimate || 0) - (x.usd_estimate || 0));
+      const transfers = (xfers?.items || []).slice(0, 20).map(t => {
+        const out = t.from?.hash?.toLowerCase() === a, other = out ? t.to : t.from, dec = Number(t.total?.decimals ?? t.token?.decimals ?? 18);
+        return { at: t.timestamp, direction: out ? "out" : "in", token: t.token?.symbol, amount: fromUnits(BigInt(t.total?.value || 0), dec),
+          counterparty: other?.hash, counterparty_label: label(other), method: t.method || null, tx: `${EXPLORER}/tx/${t.transaction_hash}` };
+      });
+      const offers = [];
+      try {
+        const next = Number(BigInt(await call(env, chordAddr(env), SEL.nextOfferId)));
+        for (let id = next - 1; id >= 1 && id >= next - 50; id--) {
+          const o = await readOffer(env, id);
+          if (o.maker.toLowerCase() === a && o.status === "open" && (!o.expiresAt || o.expiresAt * 1000 > Date.now())) offers.push(await describeOffer(env, o));
+        }
+      } catch { /* Chord read failed: report the rest */ }
+      return { address, network: "Arc mainnet (5042)",
+        kind: info?.is_contract ? (info.implementations?.[0]?.name ? `contract (${info.implementations[0].name})` : "contract") : "wallet",
+        created: info?.creation_transaction_hash ? { by: info.creator_address_hash, tx: `${EXPLORER}/tx/${info.creation_transaction_hash}` } : null,
+        explorer_flags: { scam: !!info?.is_scam, reputation: info?.reputation || null },
+        total_usd_estimate: +holdings.reduce((s, h) => s + (h.usd_estimate || 0), 0).toFixed(2), holdings, latest_transfers: transfers,
+        open_chord_offers: offers, note: "USD figures are the Arc explorer's estimates, not a price quote." };
+    },
+  },
+  {
+    name: "pro_token_report",
+    price: 5000n, // $0.005
+    description: "PRO ($0.005 per call, paid in USDC on Arc via x402). Deep report on any Arc token: the code check from chord_token_check (upgradeable, owner powers, transfer tax), plus holders count, supply, 24h volume, the top 10 holders with their share of supply and who they are (burn address, Uniswap pool, contract, wallet), how concentrated it is outside burns and pools, and any Riptide rug alarms on it in the last 30 days. Facts, not a rating. Read-only.",
+    inputSchema: { type: "object", properties: { token: { type: "string", description: "Token address on Arc" } }, required: ["token"] },
+    annotations: { readOnlyHint: true, openWorldHint: true },
+    async run({ token }, env) {
+      if (!isAddr(token)) throw new Error("token must be a 0x address");
+      const a = token.toLowerCase();
+      const check = await TOOLS.find(t => t.name === "chord_token_check").run({ token: a }, env);
+      if (check.verdict) return check;
+      const [info, holders, alarms] = await Promise.all([explorer(`/tokens/${a}`), explorer(`/tokens/${a}/holders`), riptide(env, "/api/events?days=30").catch(() => null)]);
+      const dec = Number(info?.decimals ?? 18), supply = BigInt(info?.total_supply || 0);
+      const pct = v => supply ? +(Number((BigInt(v) * 1000000n) / supply) / 10000).toFixed(2) : null;
+      const top = (holders?.items || []).slice(0, 10).map(h => {
+        const l = label(h.address);
+        const kind = l === "burn address" ? "burn" : /pool|pair/i.test(l || "") ? "liquidity pool" : h.address?.is_contract ? "contract" : "wallet";
+        return { address: h.address?.hash, label: l, kind, amount: fromUnits(BigInt(h.value || 0), dec), pct_of_supply: pct(h.value || 0) };
+      });
+      const other = top.filter(h => h.kind === "wallet" || h.kind === "contract");
+      const sym = (info?.symbol || check.symbol || "").toUpperCase();
+      return { ...check, name: info?.name || null, holders_count: info?.holders_count ? Number(info.holders_count) : null,
+        total_supply: supply ? fromUnits(supply, dec) : null, volume_24h_usd: info?.volume_24h ? Number(info.volume_24h) : null,
+        explorer_reputation: info?.reputation || null, top_holders: top,
+        concentration: { top10_outside_burn_and_pools_pct: +other.reduce((s, h) => s + (h.pct_of_supply || 0), 0).toFixed(2),
+          largest_single_holder_pct: other[0]?.pct_of_supply ?? 0 },
+        riptide_rug_alarms_30d: alarms ? (alarms.rows || []).filter(e => String(e.pair || "").toUpperCase().includes(sym) && sym).map(e => ({ at: new Date(e.ts * 1000).toISOString(), pair: e.pair, kind: e.kind, change_pct: +(e.change * 100).toFixed(1) })) : null,
+        note: "Facts from the token's code and Arc's explorer, not a rating or advice." };
+    },
+  },
+];
+const priceText = p => "$" + (Number(p) / 1e6).toString();
+
+// Runs a Pro tool with x402: no payment -> PaymentRequired; payment -> check it, run the tool, settle, return.
+// The tool runs before settling so a failed tool never charges; its result is only released once Circle settles.
+async function runPaid(tool, args, payment, env, resourceUrl) {
+  if (!seller(env)) return { status: 503, error: "Pro tools aren't switched on yet (no payment wallet configured)." };
+  const req = requirements(env, tool.price, resourceUrl, `${tool.name}: ${priceText(tool.price)} per call`);
+  if (!payment) return { status: 402, required: paymentRequired(req) };
+  let payer;
+  try { payer = await checkPayment(payment, req, { rpcCall: (to, data) => call(env, to, data) }); }
+  catch (e) { return { status: 402, required: paymentRequired(req, "Payment invalid: " + e.message) }; }
+  let result;
+  try { result = await tool.run(args || {}, env); }
+  catch (e) { return { status: 400, error: (e.message || String(e)) + " (nothing was charged)" }; }
+  const s = await settle(env, payment, req);
+  if (!s.success) return { status: 402, required: paymentRequired(req, "Payment could not be settled: " + s.error) };
+  return { status: 200, result, settlement: { success: true, transaction: s.transaction, network: s.network || NETWORK, payer: s.payer || payer } };
+}
+
 // ---------- MCP over HTTP (stateless JSON-RPC) ----------
 const CORS = { "access-control-allow-origin": "*", "access-control-allow-methods": "GET, POST, OPTIONS",
-  "access-control-allow-headers": "content-type, accept, mcp-protocol-version, mcp-session-id", "access-control-expose-headers": "mcp-session-id" };
+  "access-control-allow-headers": "content-type, accept, mcp-protocol-version, mcp-session-id, payment-signature, x-payment",
+  "access-control-expose-headers": "mcp-session-id, payment-required, payment-response" };
+const b64 = o => btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const unb64 = s => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/")))));
 const reply = (body, status = 200) => new Response(body == null ? null : JSON.stringify(body), { status, headers: { "content-type": "application/json", ...CORS } });
 const ok = (id, result) => ({ jsonrpc: "2.0", id, result });
 const err = (id, code, message) => ({ jsonrpc: "2.0", id, error: { code, message } });
 
-async function handle(msg, env) {
+async function handle(msg, env, origin) {
   const { id, method, params = {} } = msg || {};
   const isNotification = id === undefined || id === null;
   switch (method) {
     case "initialize": {
       const v = PROTOCOLS.includes(params.protocolVersion) ? params.protocolVersion : PROTOCOLS[0];
       return ok(id, { protocolVersion: v, capabilities: { tools: { listChanged: false } }, serverInfo: SERVER,
-        instructions: "Tools for Circle's Arc mainnet: balances, Uniswap quotes, Riptide price gaps and rug alarms, Crescent payment links, and Chord OTC (open offers, token checks, and unsigned create/fill/cancel transactions for the user to sign in their own wallet). Nothing here signs or sends anything." });
+        instructions: "Cadence: tools for Circle's Arc mainnet: balances, Uniswap quotes, Riptide price gaps and rug alarms, Crescent payment links, and Chord OTC (open offers, token checks, and unsigned create/fill/cancel transactions for the user to sign in their own wallet). Nothing here signs or sends anything on the user's behalf. Tools named pro_* cost a fraction of a cent in USDC on Arc per call, paid with x402: call once to get the price, then retry with params._meta[\"x402/payment\"]. Use the free tools unless the user wants the deeper report." });
     }
     case "notifications/initialized": case "notifications/cancelled": return null;
     case "ping": return ok(id, {});
-    case "tools/list": return ok(id, { tools: TOOLS.map(({ run, ...t }) => t) });
+    case "tools/list": return ok(id, { tools: [...TOOLS.map(({ run, ...t }) => t), ...PRO_TOOLS.map(({ run, price, ...t }) => ({ ...t, _meta: { "x402/price": { amount: String(price), asset: "USDC", network: NETWORK } } }))] });
     case "tools/call": {
+      const pro = PRO_TOOLS.find(t => t.name === params.name);
+      if (pro) {
+        const r = await runPaid(pro, params.arguments, params._meta?.["x402/payment"], env, `${origin}/mcp#${pro.name}`);
+        if (r.status === 200) return ok(id, { content: [{ type: "text", text: JSON.stringify(r.result, null, 2) }], structuredContent: r.result, isError: false, _meta: { "x402/payment-response": r.settlement } });
+        if (r.required) return ok(id, { content: [{ type: "text", text: JSON.stringify(r.required) }], structuredContent: r.required, isError: true });
+        return ok(id, { content: [{ type: "text", text: "Error: " + r.error }], isError: true });
+      }
       const tool = TOOLS.find(t => t.name === params.name);
       if (!tool) return err(id, -32602, "Unknown tool: " + params.name);
       try {
@@ -401,13 +523,41 @@ async function handle(msg, env) {
   }
 }
 
+// Plain-HTTP x402 for the Pro tools: POST /x402/<tool> with JSON arguments (or GET with ?query). Without a
+// PAYMENT-SIGNATURE header the answer is 402 with PAYMENT-REQUIRED; with one, 200 plus PAYMENT-RESPONSE.
+async function httpPaid(req, env, url) {
+  const name = decodeURIComponent(url.pathname.slice("/x402/".length));
+  const tool = PRO_TOOLS.find(t => t.name === name);
+  if (!tool) return reply({ error: "unknown Pro tool", tools: PRO_TOOLS.map(t => t.name) }, 404);
+  let args = Object.fromEntries(url.searchParams);
+  if (req.method === "POST") { try { const t = await req.text(); if (t) args = { ...args, ...JSON.parse(t) }; } catch { return reply({ error: "body must be JSON arguments" }, 400); } }
+  let payment = null;
+  const h = req.headers.get("payment-signature") || req.headers.get("x-payment");
+  if (h) { try { payment = unb64(h); } catch { return reply({ error: "PAYMENT-SIGNATURE must be base64 JSON" }, 400); } }
+  const r = await runPaid(tool, args, payment, env, url.origin + url.pathname);
+  if (r.status === 200) return new Response(JSON.stringify(r.result), { status: 200, headers: { "content-type": "application/json", "payment-response": b64(r.settlement), ...CORS } });
+  if (r.required) return new Response(JSON.stringify(r.required), { status: 402, headers: { "content-type": "application/json", "payment-required": b64(r.required), ...CORS } });
+  return reply({ error: r.error }, r.status);
+}
+
+const RPC_FOR_SWEEP = env => env.ARC_RPC_URL || ARC_RPC;
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
     if (url.pathname === "/" && req.method === "GET") {
-      return reply({ name: SERVER.name, version: SERVER.version, mcp_endpoint: url.origin + "/mcp", transport: "streamable-http (stateless)",
-        tools: TOOLS.map(t => t.name), read_only: true, signs_or_sends: false, source: "https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/arc-mcp" });
+      const w = seller(env);
+      return reply({ name: SERVER.name, title: SERVER.title, version: SERVER.version, home: "https://chordotc.com/cadence/", mcp_endpoint: url.origin + "/mcp", transport: "streamable-http (stateless)",
+        tools: TOOLS.map(t => t.name),
+        pro_tools: PRO_TOOLS.map(t => ({ name: t.name, price_usdc: Number(t.price) / 1e6, http: url.origin + "/x402/" + t.name })),
+        payments: { protocol: "x402 v2, scheme exact", network: NETWORK, asset: "USDC", pay_to: w ? w.address : null, settled_by: "Circle Facilitator Service", enabled: !!w },
+        read_only: true, signs_or_sends: "never on your behalf; payments only move USDC you authorise to Cadence's receive wallet", source: "https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/arc-mcp" });
+    }
+    if (url.pathname.startsWith("/x402/") && (req.method === "GET" || req.method === "POST")) return httpPaid(req, env, url);
+    // Anyone may trigger a sweep: it can only send the receive wallet's USDC to the Chord Treasury Safe.
+    if (url.pathname === "/sweep" && req.method === "POST") {
+      try { return reply(await sweep(env, RPC_FOR_SWEEP(env))); } catch (e) { return reply({ swept: false, error: e.shortMessage || e.message }, 500); }
     }
     if (url.pathname !== "/mcp") return reply({ error: "not found" }, 404);
     if (req.method === "GET") return new Response("This MCP server doesn't stream; POST JSON-RPC to /mcp.", { status: 405, headers: { allow: "POST", ...CORS } });
@@ -415,10 +565,15 @@ export default {
     let body;
     try { body = await req.json(); } catch { return reply(err(null, -32700, "Parse error"), 400); }
     if (Array.isArray(body)) {
-      const out = (await Promise.all(body.map(m => handle(m, env)))).filter(Boolean);
+      const out = (await Promise.all(body.map(m => handle(m, env, url.origin)))).filter(Boolean);
       return out.length ? reply(out) : new Response(null, { status: 202, headers: CORS });
     }
-    const res = await handle(body, env);
+    const res = await handle(body, env, url.origin);
     return res ? reply(res) : new Response(null, { status: 202, headers: CORS });
   },
+  // Weekly: move Pro income from the receive wallet to the Chord Treasury Safe (only if there's at least 1 USDC).
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(sweep(env, RPC_FOR_SWEEP(env)).then(r => console.log("sweep", JSON.stringify(r))).catch(e => console.log("sweep failed", e.message)));
+  },
 };
+
