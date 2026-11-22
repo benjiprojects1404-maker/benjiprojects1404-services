@@ -11,7 +11,7 @@
 
 import { requirements, paymentRequired, checkPayment, settle, seller, sweep, NETWORK } from "./x402.js";
 
-const SERVER = { name: "cadence", title: "Cadence (Arc MCP)", version: "0.3.0" };
+const SERVER = { name: "cadence", title: "Cadence (Arc MCP)", version: "0.3.1" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const ARC_RPC = "https://rpc.mainnet.arc.io";
 const EXPLORER = "https://explorer.arc.io";
@@ -21,6 +21,8 @@ const USDC = "0x3600000000000000000000000000000000000000";
 const QUOTER_V3 = "0x7dfd4f31be6814d2906bde155c3e1b146eac1468";
 const CHORD = "0x41a2bb48a9271c7dc4cf3e36d70f497abf2878e8"; // ChordOTCv2: offers never hold funds
 const CHORD_SITE = "https://chordotc.com/";
+// Arc's explorer (Blockscout) refuses requests without a browser-like User-Agent, which Workers don't send.
+const EXPLORER_HEADERS = { accept: "application/json", "user-agent": "Mozilla/5.0 (compatible; Cadence/0.3; +https://chordotc.com/cadence/)" };
 const SEL = { nextOfferId: "0x5f5d0655", getOffer: "0x4579268a", offerReady: "0xb9c73968", feeBps: "0x24a9d853", paused: "0x5c975abb",
   createUsdc: "0xdc94e565", createToken: "0x6332c991", fill: "0x85dba861", cancel: "0xef706adf", approve: "0x095ea7b3",
   allowance: "0xdd62ed3e", balanceOf: "0x70a08231", symbol: "0x95d89b41", decimals: "0x313ce567", maxOfferAmount: "0x8848bfa6" };
@@ -226,7 +228,7 @@ const TOOLS = [
       if (!isAddr(to)) throw new Error("to must be a 0x address");
       const t = TOKENS[token]; if (!t) throw new Error("unknown token");
       const want = toUnits(amount, t.dec).toString();
-      const r = await fetch(`${EXPLORER}/api/v2/addresses/${to}/token-transfers?type=ERC-20&filter=to&token=${t.addr}`, { headers: { accept: "application/json" } });
+      const r = await fetch(`${EXPLORER}/api/v2/addresses/${to}/token-transfers?type=ERC-20&filter=to&token=${t.addr}`, { headers: EXPLORER_HEADERS });
       if (!r.ok) throw new Error("explorer " + r.status);
       const j = await r.json();
       const hit = (j.items || []).find(i => i.to?.hash?.toLowerCase() === to.toLowerCase() && i.token?.address_hash?.toLowerCase() === t.addr
@@ -384,7 +386,7 @@ const TOOLS = [
 // ---------- Pro tools (paid per call with x402) ----------
 // Heavier reports built from Arc's explorer plus on-chain reads. Prices are in USDC base units (6 decimals).
 async function explorer(path) {
-  const r = await fetch(EXPLORER + "/api/v2" + path, { headers: { accept: "application/json" } });
+  const r = await fetch(EXPLORER + "/api/v2" + path, { headers: EXPLORER_HEADERS });
   if (r.status === 404) return null;
   if (!r.ok) throw new Error(`Arc explorer ${path.split("?")[0]} failed: HTTP ${r.status}`);
   return r.json();
