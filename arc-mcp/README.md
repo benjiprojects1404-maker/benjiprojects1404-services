@@ -1,4 +1,6 @@
-# Arc MCP
+# Cadence (Arc MCP)
+
+**Cadence** is the public name of this server. Landing page and how to connect: https://chordotc.com/cadence/
 
 A read-only [Model Context Protocol](https://modelcontextprotocol.io) server for Circle's Arc mainnet (chain 5042).
 Plug it into an AI assistant and it can answer questions like "what's in this Arc wallet?", "what would $1,000 of
