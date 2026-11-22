@@ -1,5 +1,7 @@
 # Arc MCP
 
+**Landing page and how to connect:** https://benjiprojects1404-services.pages.dev/arc-mcp/
+
 A read-only [Model Context Protocol](https://modelcontextprotocol.io) server for Circle's Arc mainnet (chain 5042).
 Plug it into an AI assistant and it can answer questions like "what's in this Arc wallet?", "what would $1,000 of
 cirBTC cost on Arc right now?", "any rug alarms on Arc today?", "make me a payment link for 25 USDC", "what's open on
