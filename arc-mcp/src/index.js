@@ -19,13 +19,18 @@ const RIPTIDE = "https://riptide.benjiprojects1404.workers.dev";
 const CRESCENT = "https://chordotc.com/crescent/";
 const USDC = "0x3600000000000000000000000000000000000000";
 const QUOTER_V3 = "0x7dfd4f31be6814d2906bde155c3e1b146eac1468";
-const CHORD = "0x41a2bb48a9271c7dc4cf3e36d70f497abf2878e8"; // ChordOTCv2: offers never hold funds
+const CHORD_V2 = "0x41a2bb48a9271c7dc4cf3e36d70f497abf2878e8"; // ChordOTCv2: offers never hold funds
+// ChordOTC v2.1 (committed amounts per maker, maker's max fee). Fill in the address once deployed; until then
+// Cadence keeps using v2. v2.1's create functions take one more argument (maxFeeBps).
+const CHORD_V21 = "";
+const CHORD = (CHORD_V21 || CHORD_V2).toLowerCase();
 const CHORD_SITE = "https://chordotc.com/";
 // Arc's explorer (Blockscout) refuses requests without a browser-like User-Agent, which Workers don't send.
 const EXPLORER_HEADERS = { accept: "application/json", "user-agent": "Mozilla/5.0 (compatible; Cadence/0.3; +https://chordotc.com/cadence/)" };
 const SEL = { nextOfferId: "0x5f5d0655", getOffer: "0x4579268a", offerReady: "0xb9c73968", feeBps: "0x24a9d853", paused: "0x5c975abb",
   createUsdc: "0xdc94e565", createToken: "0x6332c991", fill: "0x85dba861", cancel: "0xef706adf", approve: "0x095ea7b3",
-  allowance: "0xdd62ed3e", balanceOf: "0x70a08231", symbol: "0x95d89b41", decimals: "0x313ce567", maxOfferAmount: "0x8848bfa6" };
+  allowance: "0xdd62ed3e", balanceOf: "0x70a08231", symbol: "0x95d89b41", decimals: "0x313ce567", maxOfferAmount: "0x8848bfa6",
+  createUsdc21: "0x784ff6ea", createToken21: "0xb9e5709e", committed: "0x0423dfab" };
 
 // The ten tokens listed on Chord OTC, matched by address (Arc has look-alike tokens with the same names).
 const TOKENS = {
@@ -84,6 +89,9 @@ async function rpc(env, method, params) {
 }
 const call = (env, to, data) => rpc(env, "eth_call", [{ to, data }, "latest"]);
 const chordAddr = env => (env.CHORD_OTC && isAddr(env.CHORD_OTC) ? env.CHORD_OTC : CHORD).toLowerCase();
+const isV21 = env => !!CHORD_V21 && chordAddr(env) === CHORD_V21.toLowerCase();
+// Share links: v2.1 links carry c=2.1 so the site can tell them from older v2 links with the same id.
+const offerLink = (env, id) => CHORD_SITE + (isV21(env) ? "#c=2.1&offer=" : "#offer=") + id;
 const words = hex => (hex || "0x").slice(2).match(/.{64}/g) || [];
 const wAddr = w => "0x" + w.slice(24);
 function decodeString(hex) {
@@ -125,7 +133,7 @@ async function describeOffer(env, o, withReady = true) {
     maker: o.maker, private_taker: o.taker === "0x0000000000000000000000000000000000000000" ? null : o.taker,
     expires: o.expiresAt ? new Date(o.expiresAt * 1000).toISOString() : null, fee_pct: o.feeBps / 100,
     fillable_now: ready, ...(ready === false ? { why_not: "The maker no longer has the balance or approval for this offer, so a fill would fail." } : {}),
-    link: CHORD_SITE + "#offer=" + o.id };
+    link: offerLink(env, o.id) };
 }
 const tx = (to, data, what) => ({ to, value: "0", data, what });
 
@@ -312,8 +320,15 @@ const TOOLS = [
         if (d.private_taker && d.private_taker.toLowerCase() !== me) throw new Error("this offer is private to another address");
         if (d.fillable_now === false) throw new Error(d.why_not);
         const [payTok, payAmt, payDec, paySym] = o.makerGivesUsdc ? [o.token, o.amountToken, (await tokenMeta(env, o.token)).dec, d.token.symbol] : [USDC, o.amountUsdc, 6, "USDC"];
-        if (await bal(payTok) < payAmt) throw new Error(`the wallet holds less than the ${fromUnits(payAmt, payDec)} ${paySym} this fill needs`);
-        if (await allowed(payTok) < payAmt) steps.push(tx(payTok, SEL.approve + addrWord(chord) + word(payAmt), `Approve Chord to move exactly ${fromUnits(payAmt, payDec)} ${paySym}`));
+        // v2.1: the wallet's own open offers on this asset must stay backed after the fill, so the balance and
+        // approval have to cover them plus this fill.
+        const mine = isV21(env) ? BigInt(await call(env, chord, SEL.committed + addrWord(me) + addrWord(payTok))) : 0n;
+        if (await bal(payTok) < payAmt + mine) throw new Error(mine
+          ? `the wallet needs ${fromUnits(payAmt + mine, payDec)} ${paySym}: ${fromUnits(payAmt, payDec)} for this fill plus ${fromUnits(mine, payDec)} backing its own open Chord offers`
+          : `the wallet holds less than the ${fromUnits(payAmt, payDec)} ${paySym} this fill needs`);
+        if (await allowed(payTok) < payAmt + mine) steps.push(tx(payTok, SEL.approve + addrWord(chord) + word(payAmt + mine), mine
+          ? `Approve Chord for ${fromUnits(payAmt + mine, payDec)} ${paySym}: this fill plus the ${fromUnits(mine, payDec)} behind your own open offers`
+          : `Approve Chord to move exactly ${fromUnits(payAmt, payDec)} ${paySym}`));
         steps.push(tx(chord, SEL.fill + word(o.id), `Fill offer #${o.id}`));
         const fee = (o.amountUsdc * BigInt(o.feeBps)) / 10000n;
         if (!d.token.listed_on_chord) notes.push(d.token.warning);
@@ -333,14 +348,29 @@ const TOOLS = [
         if (taker.toLowerCase() === me) throw new Error("you can't make an offer to yourself");
         const exp = a.expires_in_hours ? Math.floor(Date.now() / 1000 + a.expires_in_hours * 3600) : 0;
         const [giveTok, giveAmt, giveDec, giveSym] = a.give === "USDC" ? [USDC, amtUsdc, 6, "USDC"] : [tokAddr, amtTok, t.dec, t.sym];
-        if (await bal(giveTok) < giveAmt) throw new Error(`the wallet holds less than ${fromUnits(giveAmt, giveDec)} ${giveSym}, and Chord checks the balance when the offer is made`);
+        const v21 = isV21(env);
+        const mine = v21 ? BigInt(await call(env, chord, SEL.committed + addrWord(me) + addrWord(giveTok))) : 0n;
+        const needGive = giveAmt + mine; // v2.1: every open offer on this asset plus the new one
+        if (await bal(giveTok) < needGive) throw new Error(mine
+          ? `the wallet needs ${fromUnits(needGive, giveDec)} ${giveSym}: ${fromUnits(giveAmt, giveDec)} for this offer plus ${fromUnits(mine, giveDec)} already promised in its open Chord offers`
+          : `the wallet holds less than ${fromUnits(giveAmt, giveDec)} ${giveSym}, and Chord checks the balance when the offer is made`);
         for (const [tok, amt, dec, sym] of [[USDC, amtUsdc, 6, "USDC"], [tokAddr, amtTok, t.dec, t.sym]]) {
           const cap = BigInt(await call(env, chord, SEL.maxOfferAmount + addrWord(tok)));
           if (cap && amt > cap) throw new Error(`${fromUnits(amt, dec)} ${sym} is over Chord's per-offer limit of ${fromUnits(cap, dec)} ${sym} during the beta`);
         }
-        if (await allowed(giveTok) < giveAmt) steps.push(tx(giveTok, SEL.approve + addrWord(chord) + word(giveAmt), `Approve Chord to move exactly ${fromUnits(giveAmt, giveDec)} ${giveSym} when the offer is filled (it stays in your wallet until then)`));
-        const sel = a.give === "USDC" ? SEL.createUsdc : SEL.createToken;
-        steps.push(tx(chord, sel + addrWord(tokAddr) + word(amtTok) + word(amtUsdc) + addrWord(taker) + word(exp), "Create the offer"));
+        if (await allowed(giveTok) < needGive) steps.push(tx(giveTok, SEL.approve + addrWord(chord) + word(needGive), mine
+          ? `Approve Chord for ${fromUnits(needGive, giveDec)} ${giveSym}: this offer plus your ${fromUnits(mine, giveDec)} in open offers (it all stays in your wallet until filled)`
+          : `Approve Chord to move exactly ${fromUnits(giveAmt, giveDec)} ${giveSym} when the offer is filled (it stays in your wallet until then)`));
+        let data;
+        if (v21) {
+          // maxFeeBps = today's fee: if the fee goes up before this is signed, the create fails instead of charging more.
+          const fee = BigInt(await call(env, chord, SEL.feeBps));
+          data = (a.give === "USDC" ? SEL.createUsdc21 : SEL.createToken21) + addrWord(tokAddr) + word(amtTok) + word(amtUsdc) + addrWord(taker) + word(exp) + word(fee);
+          notes.push(`The fee is locked at today's ${Number(fee) / 100}%: if it rises before you sign, the transaction fails rather than charging more.`);
+        } else {
+          data = (a.give === "USDC" ? SEL.createUsdc : SEL.createToken) + addrWord(tokAddr) + word(amtTok) + word(amtUsdc) + addrWord(taker) + word(exp);
+        }
+        steps.push(tx(chord, data, "Create the offer"));
         if (!t.listed) notes.push("This token isn't on Chord's list. Run chord_token_check before trading it.");
         notes.push("After it's created, the site shows it at " + CHORD_SITE + "; share the offer link with your counterparty.");
         return { action: "create", summary: `Offer ${a.give === "USDC" ? `${fromUnits(amtUsdc, 6)} USDC for ${fromUnits(amtTok, t.dec)} ${t.sym}` : `${fromUnits(amtTok, t.dec)} ${t.sym} for ${fromUnits(amtUsdc, 6)} USDC`}${taker !== "0x0000000000000000000000000000000000000000" ? `, only for ${taker}` : ""}${exp ? `, expiring ${new Date(exp * 1000).toISOString()}` : ""}. Your side stays in your wallet until someone fills it.`,
