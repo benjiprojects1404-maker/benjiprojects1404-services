@@ -22,7 +22,7 @@ const QUOTER_V3 = "0x7dfd4f31be6814d2906bde155c3e1b146eac1468";
 const CHORD_V2 = "0x41a2bb48a9271c7dc4cf3e36d70f497abf2878e8"; // ChordOTCv2: offers never hold funds
 // ChordOTC v2.1 (committed amounts per maker, maker's max fee). Fill in the address once deployed; until then
 // Cadence keeps using v2. v2.1's create functions take one more argument (maxFeeBps).
-const CHORD_V21 = "";
+const CHORD_V21 = "0xcDAA3E1A661B59f7eA9d8804c971C12D2A0dE5c4"; // deployed 24 Nov 2026
 const CHORD = (CHORD_V21 || CHORD_V2).toLowerCase();
 const CHORD_SITE = "https://chordotc.com/";
 // Arc's explorer (Blockscout) refuses requests without a browser-like User-Agent, which Workers don't send.
