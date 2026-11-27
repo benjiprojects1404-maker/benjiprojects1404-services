@@ -42,6 +42,10 @@ which broadcasts the transfer and pays the gas.
 - **Over plain HTTP:** `GET` or `POST /x402/<tool>` (arguments as query or JSON body). The first answer is `402` with a
   `PAYMENT-REQUIRED` header; retry with `PAYMENT-SIGNATURE`; the `200` carries `PAYMENT-RESPONSE`. Works with standard
   x402 clients.
+- **Discovery:** `GET /openapi.json` (also `/.well-known/openapi.json`) describes both paid routes with their price in
+  `x-payment-info`; `GET /.well-known/x402` lists them; every `402` carries x402 Bazaar metadata
+  (`extensions.bazaar`: input, output example, input schema). This is what Circle's Agent Marketplace and other x402
+  catalogs read to list Cadence.
 - **Never charged for nothing:** the payment is checked (amount, payee, expiry, signature, the payer's USDC balance)
   before any work; the report is built before settling, so a failed report charges nothing; and the report is only
   released once Circle confirms the transfer.

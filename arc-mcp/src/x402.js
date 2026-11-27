@@ -41,10 +41,10 @@ export function requirements(env, price, resourceUrl, description) {
     _resource: { url: resourceUrl, description, mimeType: "application/json" },
   };
 }
-const accepts = r => { const { _resource, ...a } = r; return a; };
+const accepts = r => { const { _resource, _extensions, ...a } = r; return a; };
 
 export function paymentRequired(req, error = "Payment required") {
-  return { x402Version: 2, error, resource: req._resource, accepts: [accepts(req)] };
+  return { x402Version: 2, error, resource: req._resource, accepts: [accepts(req)], ...(req._extensions ? { extensions: req._extensions } : {}) };
 }
 
 /** Checks a payment payload against what we asked for, before doing any work. Returns the payer or throws. */
