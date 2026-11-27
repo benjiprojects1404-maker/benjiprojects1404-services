@@ -186,7 +186,7 @@ test("settlement refused: no report is released", async () => {
   const r = (await mcp(env(), call("pro_token_report", { token: TOKEN }, await pay(pr)))).result;
   assert.equal(r.isError, true);
   assert.match(r.structuredContent.error, /could not be settled/);
-  assert.ok(!JSON.stringify(r).includes("holders_count"));
+  assert.ok(!JSON.stringify(r).includes("000000000000000000000000000000000000dEaD")) // no real report data (the 402 carries only the made-up example);
 });
 
 test("pending settlement is polled via /status (signed GET proof) until completed", async () => {
@@ -239,4 +239,40 @@ test("root lists Pro tools, prices and the receive address", async () => {
   assert.equal(j.name, "cadence");
   assert.equal(j.payments.pay_to, SELLER.address);
   assert.deepEqual(j.pro_tools.map(t => t.price_usdc), [0.005, 0.005]);
+});
+
+test("openapi.json lists the Pro tools with price, x402 terms and schemas", async () => {
+  for (const path of ["/openapi.json", "/.well-known/openapi.json"]) {
+    const r = await worker.fetch(new Request("https://cadence.test" + path), env());
+    assert.equal(r.status, 200);
+    const o = await r.json();
+    assert.equal(o.openapi, "3.1.0");
+    assert.equal(o.servers[0].url, "https://cadence.test");
+    for (const name of ["pro_wallet_report", "pro_token_report"]) {
+      const op = o.paths["/x402/" + name].post;
+      assert.equal(op.operationId, name);
+      assert.equal(op["x-payment-info"].price.amount, "0.005000");
+      assert.equal(op["x-payment-info"].protocols[0].x402.network, "eip155:5042");
+      assert.equal(op["x-payment-info"].protocols[0].x402.payTo, SELLER.address);
+      assert.ok(op.requestBody.content["application/json"].schema.required.length);
+      assert.ok(op.responses[402]);
+    }
+  }
+  const d = await (await worker.fetch(new Request("https://cadence.test/.well-known/x402"), env())).json();
+  assert.deepEqual(d.resources, ["https://cadence.test/x402/pro_wallet_report", "https://cadence.test/x402/pro_token_report"]);
+});
+
+test("402 carries Bazaar discovery metadata; tools/list doesn't leak it", async () => {
+  const r = await worker.fetch(new Request("https://cadence.test/x402/pro_token_report", { method: "POST", body: JSON.stringify({ token: TOKEN }) }), env());
+  assert.equal(r.status, 402);
+  const req = JSON.parse(Buffer.from(r.headers.get("payment-required"), "base64").toString());
+  assert.equal(req.extensions.bazaar.info.input.type, "http");
+  assert.equal(req.extensions.bazaar.info.input.method, "POST");
+  assert.equal(req.extensions.bazaar.info.output.type, "json");
+  assert.equal(req.resource.serviceName, "Cadence");
+  assert.ok(req.resource.tags.length <= 5);
+  assert.equal(req.accepts[0].extensions, undefined);
+  const l = await mcp(env(), { jsonrpc: "2.0", id: 1, method: "tools/list" });
+  const pro = l.result.tools.find(t => t.name === "pro_token_report");
+  assert.equal(pro.example, undefined); assert.equal(pro.outputExample, undefined);
 });

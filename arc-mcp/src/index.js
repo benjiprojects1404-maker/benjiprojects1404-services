@@ -11,7 +11,7 @@
 
 import { requirements, paymentRequired, checkPayment, settle, seller, sweep, NETWORK } from "./x402.js";
 
-const SERVER = { name: "cadence", title: "Cadence (Arc MCP)", version: "0.3.1" };
+const SERVER = { name: "cadence", title: "Cadence (Arc MCP)", version: "0.4.0" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const ARC_RPC = "https://rpc.mainnet.arc.io";
 const EXPLORER = "https://explorer.arc.io";
@@ -431,6 +431,11 @@ const PRO_TOOLS = [
     description: "PRO ($0.005 per call, paid in USDC on Arc via x402). Full report on any Arc address: every ERC-20 it holds (not just Chord's list) with the explorer's USD estimate and scam flags, whether it's a wallet or a contract (and which kind, e.g. a Safe), when it was created, its 20 latest token transfers in and out with counterparties, and any open Chord OTC offers it made. Read-only.",
     inputSchema: { type: "object", properties: { address: { type: "string", description: "Arc address, 0x…" } }, required: ["address"] },
     annotations: { readOnlyHint: true, openWorldHint: true },
+    summary: "Full report on any Arc wallet or contract",
+    example: { address: "0xc3FC2A5D1E7e2F5d597bE891e4BC36F117D9d4B6" },
+    outputExample: { address: "0xc3FC…d4B6", network: "Arc mainnet (5042)", kind: "contract (GnosisSafeL2)", total_usd_estimate: 120.5,
+      holdings: [{ symbol: "USDC", amount: "120.5", usd_estimate: 120.5, listed_on_chord: true }],
+      latest_transfers: [{ at: "2026-11-24T08:00:00Z", direction: "in", token: "USDC", amount: "0.005" }], open_chord_offers: [] },
     async run({ address }, env) {
       if (!isAddr(address)) throw new Error("address must be a 0x address");
       const a = address.toLowerCase();
@@ -467,6 +472,11 @@ const PRO_TOOLS = [
     description: "PRO ($0.005 per call, paid in USDC on Arc via x402). Deep report on any Arc token: the code check from chord_token_check (upgradeable, owner powers, transfer tax), plus holders count, supply, 24h volume, the top 10 holders with their share of supply and who they are (burn address, Uniswap pool, contract, wallet), how concentrated it is outside burns and pools, and any Riptide rug alarms on it in the last 30 days. Facts, not a rating. Read-only.",
     inputSchema: { type: "object", properties: { token: { type: "string", description: "Token address on Arc" } }, required: ["token"] },
     annotations: { readOnlyHint: true, openWorldHint: true },
+    summary: "Deep safety and holder report on any Arc token",
+    example: { token: "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1" },
+    outputExample: { symbol: "EURC", upgradeable: true, flags: ["upgradeable: its code can be replaced"], holders_count: 1520,
+      top_holders: [{ address: "0x…", kind: "liquidity pool", pct_of_supply: 12.4 }],
+      concentration: { top10_outside_burn_and_pools_pct: 31.2, largest_single_holder_pct: 9.8 }, riptide_rug_alarms_30d: [] },
     async run({ token }, env) {
       if (!isAddr(token)) throw new Error("token must be a 0x address");
       const a = token.toLowerCase();
@@ -494,11 +504,40 @@ const PRO_TOOLS = [
 ];
 const priceText = p => "$" + (Number(p) / 1e6).toString();
 
+// x402 Bazaar discovery metadata (extensions.bazaar), so catalogs such as Circle's Agent Marketplace can list each tool.
+const bazaar = tool => ({ bazaar: { info: {
+  input: { type: "http", method: "POST", bodyType: "json", body: tool.example },
+  output: { type: "json", example: tool.outputExample } },
+  schema: { input: tool.inputSchema } } });
+
+// OpenAPI 3.1 for the paid HTTP routes (POST /x402/<tool>), with x-payment-info so agents can see what each call costs.
+function openapi(origin, env) {
+  const w = seller(env);
+  const paths = {};
+  for (const t of PRO_TOOLS) paths["/x402/" + t.name] = { post: {
+    operationId: t.name, summary: t.summary, description: t.description, tags: ["Pro"],
+    "x-payment-info": { price: { mode: "fixed", currency: "USD", amount: (Number(t.price) / 1e6).toFixed(6) },
+      protocols: [{ x402: { version: 2, scheme: "exact", network: NETWORK, asset: USDC, payTo: w ? w.address : null } }] },
+    requestBody: { required: true, content: { "application/json": { schema: t.inputSchema, example: t.example } } },
+    responses: {
+      200: { description: "The report. The PAYMENT-RESPONSE header carries the settlement.", content: { "application/json": { schema: { type: "object" }, example: t.outputExample } } },
+      402: { description: "Payment Required. The PAYMENT-REQUIRED header (base64 JSON) lists the price; retry with a PAYMENT-SIGNATURE header." },
+      400: { description: "Bad input. Nothing is charged." } } } };
+  return { openapi: "3.1.0",
+    info: { title: "Cadence", version: SERVER.version,
+      description: "Pay-per-call reports on Circle's Arc mainnet: any wallet or token, read live from the chain and Arc's explorer. $0.005 in USDC on Arc per call via x402, settled by Circle. Read-only: nothing signs or sends on your behalf. Free tools are on the MCP endpoint at /mcp.",
+      contact: { name: "Undercurrent Works", url: "https://chordotc.com/cadence/", email: "benjamin@chordotc.com" },
+      "x-guidance": "POST JSON arguments to /x402/<tool>. The first call returns 402 with PAYMENT-REQUIRED; sign the x402 v2 exact (EIP-3009) authorization for USDC on eip155:5042 and retry with PAYMENT-SIGNATURE. A failed report is never charged." },
+    servers: [{ url: origin }], tags: [{ name: "Pro", description: "Paid tools, $0.005 each" }], paths };
+}
+
 // Runs a Pro tool with x402: no payment -> PaymentRequired; payment -> check it, run the tool, settle, return.
 // The tool runs before settling so a failed tool never charges; its result is only released once Circle settles.
 async function runPaid(tool, args, payment, env, resourceUrl) {
   if (!seller(env)) return { status: 503, error: "Pro tools aren't switched on yet (no payment wallet configured)." };
   const req = requirements(env, tool.price, resourceUrl, `${tool.name}: ${priceText(tool.price)} per call`);
+  req._resource = { ...req._resource, serviceName: "Cadence", tags: ["arc", "wallet", "token-safety", "onchain-data"] };
+  req._extensions = bazaar(tool);
   if (!payment) return { status: 402, required: paymentRequired(req) };
   let payer;
   try { payer = await checkPayment(payment, req, { rpcCall: (to, data) => call(env, to, data) }); }
@@ -532,7 +571,7 @@ async function handle(msg, env, origin) {
     }
     case "notifications/initialized": case "notifications/cancelled": return null;
     case "ping": return ok(id, {});
-    case "tools/list": return ok(id, { tools: [...TOOLS.map(({ run, ...t }) => t), ...PRO_TOOLS.map(({ run, price, ...t }) => ({ ...t, _meta: { "x402/price": { amount: String(price), asset: "USDC", network: NETWORK } } }))] });
+    case "tools/list": return ok(id, { tools: [...TOOLS.map(({ run, ...t }) => t), ...PRO_TOOLS.map(({ run, price, summary, example, outputExample, ...t }) => ({ ...t, _meta: { "x402/price": { amount: String(price), asset: "USDC", network: NETWORK } } }))] });
     case "tools/call": {
       const pro = PRO_TOOLS.find(t => t.name === params.name);
       if (pro) {
@@ -581,11 +620,13 @@ export default {
     if (url.pathname === "/" && req.method === "GET") {
       const w = seller(env);
       return reply({ name: SERVER.name, title: SERVER.title, version: SERVER.version, home: "https://chordotc.com/cadence/", mcp_endpoint: url.origin + "/mcp", transport: "streamable-http (stateless)",
-        tools: TOOLS.map(t => t.name),
+        tools: TOOLS.map(t => t.name), openapi: url.origin + "/openapi.json",
         pro_tools: PRO_TOOLS.map(t => ({ name: t.name, price_usdc: Number(t.price) / 1e6, http: url.origin + "/x402/" + t.name })),
         payments: { protocol: "x402 v2, scheme exact", network: NETWORK, asset: "USDC", pay_to: w ? w.address : null, settled_by: "Circle Facilitator Service", enabled: !!w },
         read_only: true, signs_or_sends: "never on your behalf; payments only move USDC you authorise to Cadence's receive wallet", source: "https://github.com/benjiprojects1404-maker/benjiprojects1404-services/tree/main/arc-mcp" });
     }
+    if ((url.pathname === "/openapi.json" || url.pathname === "/.well-known/openapi.json") && req.method === "GET") return reply(openapi(url.origin, env));
+    if (url.pathname === "/.well-known/x402" && req.method === "GET") return reply({ version: 1, resources: PRO_TOOLS.map(t => url.origin + "/x402/" + t.name), openapi: url.origin + "/openapi.json" });
     if (url.pathname.startsWith("/x402/") && (req.method === "GET" || req.method === "POST")) return httpPaid(req, env, url);
     // Anyone may trigger a sweep: it can only send the receive wallet's USDC to the Chord Treasury Safe.
     if (url.pathname === "/sweep" && req.method === "POST") {
