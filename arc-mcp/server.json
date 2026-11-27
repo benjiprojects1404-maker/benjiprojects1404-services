@@ -3,7 +3,7 @@
   "name": "io.github.benjiprojects1404-maker/cadence",
   "title": "Cadence (Arc MCP)",
   "description": "Circle's Arc mainnet for AI agents: balances, quotes, rug alarms, payment links, OTC offers.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "websiteUrl": "https://chordotc.com/cadence/",
   "repository": {
     "url": "https://github.com/benjiprojects1404-maker/benjiprojects1404-services",
@@ -14,6 +14,15 @@
     {
       "type": "streamable-http",
       "url": "https://arc-mcp.benjiprojects1404.workers.dev/mcp"
+    }
+  ],
+  "icons": [
+    {
+      "src": "https://chordotc.com/cadence/mark.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
     }
   ]
 }

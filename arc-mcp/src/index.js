@@ -11,7 +11,7 @@
 
 import { requirements, paymentRequired, checkPayment, settle, seller, sweep, NETWORK } from "./x402.js";
 
-const SERVER = { name: "cadence", title: "Cadence (Arc MCP)", version: "0.4.0" };
+const SERVER = { name: "cadence", title: "Cadence (Arc MCP)", version: "0.4.1" };
 const PROTOCOLS = ["2025-06-18", "2025-03-26", "2024-11-05"];
 const ARC_RPC = "https://rpc.mainnet.arc.io";
 const EXPLORER = "https://explorer.arc.io";
@@ -166,7 +166,7 @@ const TOOLS = [
     name: "arc_quote",
     description: "Real Uniswap v3 quote on Arc mainnet, including pool fee and slippage. side=buy: spend `amount` USDC on the token. side=sell: sell `amount` of the token for USDC. Tokens: " + QUOTABLE.join(", ") + ". Read-only; nothing is traded.",
     inputSchema: { type: "object", properties: {
-      token: { type: "string", enum: QUOTABLE }, side: { type: "string", enum: ["buy", "sell"] },
+      token: { type: "string", enum: QUOTABLE, description: "Token to quote against USDC" }, side: { type: "string", enum: ["buy", "sell"], description: "buy: spend USDC for the token; sell: sell the token for USDC" },
       amount: { type: "string", description: "Decimal amount: USDC when buying, token units when selling" } }, required: ["token", "side", "amount"] },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ token, side, amount }, env) {
@@ -212,8 +212,8 @@ const TOOLS = [
     name: "crescent_payment_link",
     description: "Make a Crescent payment link: whoever opens it can pay `amount` of `token` straight to `to` on Arc mainnet (no contract in between), and the page shows when the payment arrives. Only builds the link; nothing is signed or sent.",
     inputSchema: { type: "object", properties: {
-      to: { type: "string", description: "Recipient Arc address" }, token: { type: "string", enum: Object.keys(TOKENS) },
-      amount: { type: "string", description: "Decimal amount, e.g. 25 or 12.5" }, note: { type: "string", maxLength: 120 } }, required: ["to", "token", "amount"] },
+      to: { type: "string", description: "Recipient Arc address" }, token: { type: "string", enum: Object.keys(TOKENS), description: "Token to be paid in" },
+      amount: { type: "string", description: "Decimal amount, e.g. 25 or 12.5" }, note: { type: "string", maxLength: 120, description: "Optional note shown to the payer, e.g. an invoice number" } }, required: ["to", "token", "amount"] },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ to, token, amount, note }, env) {
       if (!isAddr(to)) throw new Error("to must be a 0x address");
@@ -229,8 +229,8 @@ const TOOLS = [
     name: "crescent_check_payment",
     description: "Check whether a payment of exactly `amount` `token` has reached `to` on Arc mainnet, optionally only counting transfers from `from_block` on (the `b` in a Crescent link). Uses the Arc explorer.",
     inputSchema: { type: "object", properties: {
-      to: { type: "string" }, token: { type: "string", enum: Object.keys(TOKENS) }, amount: { type: "string" },
-      from_block: { type: "integer", minimum: 0 } }, required: ["to", "token", "amount"] },
+      to: { type: "string", description: "Recipient Arc address from the payment link" }, token: { type: "string", enum: Object.keys(TOKENS), description: "Token the link asks for" }, amount: { type: "string", description: "Exact decimal amount the link asks for" },
+      from_block: { type: "integer", minimum: 0, description: "Optional: only look at transfers from this Arc block on (the link's b= value)" } }, required: ["to", "token", "amount"] },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ to, token, amount, from_block = 0 }) {
       if (!isAddr(to)) throw new Error("to must be a 0x address");
@@ -271,7 +271,7 @@ const TOOLS = [
   {
     name: "chord_offer",
     description: "One Chord OTC offer by id: terms, status, whether it can be filled right now, and what a taker must approve first. Read-only.",
-    inputSchema: { type: "object", properties: { id: { type: "integer", minimum: 1 } }, required: ["id"] },
+    inputSchema: { type: "object", properties: { id: { type: "integer", minimum: 1, description: "Chord OTC offer id" } }, required: ["id"] },
     annotations: { readOnlyHint: true, openWorldHint: true },
     async run({ id }, env) {
       const o = await readOffer(env, id | 0);
@@ -285,7 +285,7 @@ const TOOLS = [
     name: "chord_prepare",
     description: "Prepare UNSIGNED Chord OTC transactions for the user to review and sign in their own wallet: create an offer, fill one, or cancel one. Returns the transactions in order (an approval first when needed) plus a plain-English summary. Nothing is signed or sent by this tool. Funds never sit in Chord: the maker's side stays in their wallet under an approval until a fill moves both sides in one transaction.",
     inputSchema: { type: "object", properties: {
-      action: { type: "string", enum: ["create", "fill", "cancel"] },
+      action: { type: "string", enum: ["create", "fill", "cancel"], description: "create a new offer, fill an open one, or cancel your own" },
       wallet: { type: "string", description: "The user's Arc address (used to check balance, approval and eligibility)" },
       id: { type: "integer", minimum: 1, description: "Offer id (fill or cancel)" },
       give: { type: "string", enum: ["USDC", "token"], description: "create: which side the user gives" },
